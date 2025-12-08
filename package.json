@@ -3,7 +3,8 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "test-html": "ts-node --project tsconfig.json scripts/run-html-sniper.ts"
+    "test-html": "ts-node --project tsconfig.json scripts/run-html-sniper.ts",
+    "test-content": "ts-node --project tsconfig.json scripts/run-content-sniper.ts"
   },
   "devDependencies": {
     "@types/cheerio": "^0.22.35",

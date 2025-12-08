@@ -1,0 +1,27 @@
+<svg width="128" height="128" viewBox="0 0 128 128" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="bg" x1="12" y1="12" x2="116" y2="116" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#F7F9FB"/>
+      <stop offset="1" stop-color="#ECEFF4"/>
+    </linearGradient>
+    <linearGradient id="stroke" x1="36" y1="36" x2="92" y2="92" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#5FE0B7"/>
+      <stop offset="1" stop-color="#37B98E"/>
+    </linearGradient>
+    <radialGradient id="dot" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="translate(64 64) rotate(90) scale(10)">
+      <stop stop-color="#5FE0B7"/>
+      <stop offset="1" stop-color="#37B98E"/>
+    </radialGradient>
+    <filter id="shadow" x="-8" y="-8" width="144" height="144" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB">
+      <feDropShadow dx="0" dy="2" stdDeviation="4" flood-color="#37B98E" flood-opacity="0.22"/>
+    </filter>
+  </defs>
+  <rect x="8" y="8" width="112" height="112" rx="26" fill="url(#bg)"/>
+  <circle cx="64" cy="64" r="30" stroke="url(#stroke)" stroke-width="3" stroke-linecap="round" stroke-dasharray="10 8" filter="url(#shadow)"/>
+  <line x1="34" y1="64" x2="48" y2="64" stroke="url(#stroke)" stroke-width="4" stroke-linecap="round" filter="url(#shadow)"/>
+  <line x1="80" y1="64" x2="94" y2="64" stroke="url(#stroke)" stroke-width="4" stroke-linecap="round" filter="url(#shadow)"/>
+  <line x1="64" y1="34" x2="64" y2="48" stroke="url(#stroke)" stroke-width="4" stroke-linecap="round" filter="url(#shadow)"/>
+  <line x1="64" y1="80" x2="64" y2="94" stroke="url(#stroke)" stroke-width="4" stroke-linecap="round" filter="url(#shadow)"/>
+  <circle cx="64" cy="64" r="7" fill="url(#dot)" filter="url(#shadow)"/>
+</svg>
+

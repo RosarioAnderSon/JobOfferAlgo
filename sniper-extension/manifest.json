@@ -1,0 +1,24 @@
+{
+  "manifest_version": 3,
+  "name": "Anderson's Sniper - Upwork Job Evaluator",
+  "version": "1.0.0",
+  "description": "Evalúa trabajos de Upwork en tiempo real con scoring inteligente.",
+  "permissions": ["activeTab"],
+  "host_permissions": ["https://www.upwork.com/*"],
+  "content_scripts": [
+    {
+      "matches": [
+        "https://www.upwork.com/nx/*"
+      ],
+      "js": ["sniper-core.js", "content-script.js"],
+      "css": ["styles.css"],
+      "run_at": "document_idle"
+    }
+  ],
+  "icons": {
+    "16": "icons/icon16.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  }
+}
+

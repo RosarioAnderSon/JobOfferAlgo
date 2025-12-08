@@ -1,0 +1,184 @@
+// ENUMS
+
+// outcome_category / discontinuation_reason_category
+// Allowed values:
+[
+  "INEFFECTIVE",
+  "PARTIAL_RESPONSE",
+  "SIDE_EFFECTS",
+  "CONTRAINDICATED",
+  "COST_OR_INSURANCE",
+  "NON_ADHERENCE",
+  "OTHER",
+  "UNKNOWN"
+]
+
+// condition_category
+[
+  "MIGRAINE",
+  "HEADACHE_OTHER",
+  "EPILEPSY",
+  "NEUROPATHY",
+  "PARKINSONS",
+  "MS",
+  "MOVEMENT_DISORDER_OTHER",
+  "COGNITIVE_DISORDER",
+  "NEUROMUSCULAR",
+  "OTHER",
+  "UNKNOWN"
+]
+
+// therapy_request_type (target med)
+[
+  "NEW_START",
+  "CONTINUATION",
+  "RESTART",
+  "UNKNOWN"
+]
+
+// route (for target med)
+[
+  "ORAL",
+  "SUBCUTANEOUS",
+  "INTRAVENOUS",
+  "TRANSDERMAL",
+  "INTRANASAL",
+  "OTHER"
+]
+
+// formulation (target med)
+[
+  "TABLET",
+  "CAPSULE",
+  "PREFILLED_SYRINGE",
+  "PEN",
+  "PATCH",
+  "VIAL",
+  "SOLUTION",
+  "OTHER"
+]
+
+// quantity_unit (target med)
+[
+  "TABLET",
+  "CAPSULE",
+  "ML",
+  "SYRINGE",
+  "PEN",
+  "PATCH",
+  "VIAL",
+  "OTHER"
+]
+
+
+// API SHAPES
+
+// 1) ExtractRequest
+{
+  "note_text": "string - REQUIRED",
+
+  "patient_age": 42,
+  "patient_sex": "F", // "M", "F", "O" or null
+
+  "pa_indication": "chronic migraine",          // optional
+  "pa_condition_category": "MIGRAINE",          // optional enum
+  "pa_target_medication": "galcanezumab",       // optional
+  "pa_target_medication_brand": "Emgality",     // optional
+
+  "source_note_id": "note-2025-01-15",          // optional
+  "locale": "en-US"                             // optional
+}
+
+// 2) ExtractResponse
+{
+  "context": { /* PriorAuthContext */ },
+  "target_therapy": { /* PATargetTherapy */ },
+  "therapies": [ /* PriorTherapyEntry */ ],
+  "errors": [ /* ErrorItem */ ]
+}
+
+// 3) PriorAuthContext
+{
+  "patient_age": 42,
+  "patient_sex": "F",
+  "pa_indication": "chronic migraine",
+  "pa_condition_category": "MIGRAINE",
+  "pa_target_medication": "galcanezumab",
+  "pa_target_medication_brand": "Emgality",
+  "source_note_id": "note-2025-01-15",
+  "extraction_version": "v1.0.0",
+  "request_id": "uuid-or-similar"
+}
+
+// 4) PATargetTherapy (requested medication)
+{
+  "medication_name_normalized": "galcanezumab", // REQUIRED
+  "medication_name_brand": "Emgality",
+
+  "therapy_request_type": "CONTINUATION",       // REQUIRED
+
+  "dose_strength_text": "120 mg",               // REQUIRED
+  "dose_strength_mg": 120,
+
+  "route": "SUBCUTANEOUS",                      // REQUIRED enum
+  "formulation": "PREFILLED_SYRINGE",
+
+  "sig_text": "Inject 120 mg subcutaneously once monthly", // REQUIRED
+  "frequency_text": "ONCE_MONTHLY",
+  "days_supply": 30,
+
+  "quantity_dispense": 1,                       // REQUIRED
+  "quantity_unit": "SYRINGE",                   // REQUIRED
+
+  "refills_requested": 11,
+
+  "start_date_text": "on or after 01/01/2025",
+  "patient_on_med_currently": true,
+
+  "condition_category": "MIGRAINE",
+  "indication": "chronic migraine prevention",
+
+  "data_source_note_id": "note-2025-01-15",
+  "data_source_span": "Plan section",
+  "extraction_confidence": 0.9
+}
+
+// 5) PriorTherapyEntry (each prior med)
+{
+  "medication_name_normalized": "topiramate",   // REQUIRED
+  "medication_name_raw": "Topamax",
+
+  "indication": "migraine prevention",
+  "condition_category": "MIGRAINE",
+
+  "dose_text": "up to 75 mg QHS",
+  "dose_mg_per_day": 75,
+  "frequency_text": "QHS",
+  "route": "ORAL",
+
+  "trial_duration_text": "about 3 months",
+  "trial_duration_weeks": 12,
+  "trial_adequate": true,                       // REQUIRED (bool)
+
+  "outcome_category": "INEFFECTIVE",            // REQUIRED enum
+  "outcome_detail": "No meaningful reduction in headache frequency despite 3-month trial.",
+
+  "discontinuation_reason_category": "INEFFECTIVE",
+  "discontinuation_reason_detail": "Continued ≥15 headache days per month.",
+
+  "contraindication_flag": false,
+
+  "data_source_note_id": "note-2025-01-15",
+  "data_source_span": "HPI paragraph 2",
+
+  "include_in_pa": true,                        // REQUIRED (bool)
+  "extraction_confidence": 0.9                  // REQUIRED (0.0–1.0)
+}
+
+// 6) ErrorItem
+{
+  "code": "PARSE_FAILURE",
+  "message": "Unable to parse any medications from note_text.",
+  "details": "Note appears to be empty or non-clinical.",
+  "severity": "WARN" // or INFO, ERROR
+}

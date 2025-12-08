@@ -1,41 +1,48 @@
 ## Badges
 
 🟢 **Badges Buenos (Green Flags)**  
-Estos indican oportunidades de alta calidad y, salvo donde se indique, suman bonus.
+Todos los bonuses ahora son **+1** (salvo los informativos).
 
 - 🏅 **Gold standard**  
   - Condición: Hire Rate > 70% **AND** Spend > $10,000 **AND** Rating > 4.8.  
-  - Bonus: +5.0 pts.  
+  - Bonus: **+1**.  
   - Significado: Cliente élite, paga bien, contrata seguro y es amable.
 
 - 🔥 **Fresh off the oven**  
   - Condición: Posted < 1 hour.  
-  - Bonus: +2.5 pts.  
+  - Bonus: **+1**.  
   - Significado: Recién publicado. Alta probabilidad de ser visto si aplicas YA.
 
 - 🐋 **Whale client**  
   - Condición: TotalSpent > $10k **OR** Avg Spend per Job > $1,000.  
-  - Bonus: +2.5 pts.  
+  - Bonus: **+1**.  
   - Significado: Proyectos grandes y bien pagados.
 
-- 🌍 **Tier 1 country**  
+- 🌍 **Tier 1**  
   - Condición: País en lista Tier 1 (US, CA, UK, AU, DE, CH, SE, DK, NO, NL, SG, NZ).  
-  - Bonus: +2.5 pts.  
-  - Significado: Mejor cultura de pago y cumplimiento.
+  - Bonus: **+1**.  
+  - Significado: País con demanda y buen pago.
 
 - 🚀 **Elite hire rate**  
   - Condición: Hire Rate ≥ 90%.  
-  - Bonus: +2.5 pts.  
+  - Bonus: **+1**.  
   - Significado: Casi siempre contrata. No perderás connects.
+
+- 🤝 **Sociable**  
+  - Condición: Entrevista >35%, Hire Rate ≥ 80%, Rating ≥ 4.8.  
+  - Bonus: **+1**.  
+  - Significado: Responde y contrata; alta señal de cliente confiable.
+
+  > Nota: el porcentaje de entrevista se calcula como `interviewing / (proposals + invitesSent − unansweredInvites)` si el denominador es > 0.
 
 - 🏗️ **Team builder**  
   - Condición: Hires/JobsPosted > 1.5.  
-  - Bonus: 0 pts (solo informativo).  
+  - Bonus: 0 pts (solo informativo, ahora con emoji).  
   - Significado: Contrata varios por publicación. Buen backlog.
 
 - 👶 **New client**  
   - Condición: JobsPosted == 0 (si pasa kill switches).  
-  - Bonus: 0 pts (solo informativo).  
+  - Bonus: 0 pts (solo informativo, ahora con emoji).  
   - Significado: Cliente nuevo; beneficio de la duda.
 
 - 🚀 **Boost it!** (Badge de acción)  
@@ -44,23 +51,49 @@ Estos indican oportunidades de alta calidad y, salvo donde se indique, suman bon
   - Significado: Cliente bueno pero con competencia; conviene pagar boost.
 
 🔴 **Badges Malos (Red Flags)**  
-Advertencias críticas; algunas restan puntos o son kill-switch.
+Todas las penalizaciones ahora son **-1** salvo kill-switch.
 
 - 👀 **Window shopper**  
   - Condición: Hire Rate < 65% (con > 3 jobs posted).  
-  - Penalización: **-10.0 pts**. Ghosting = peor pérdida de tiempo.
+  - Penalización: **-1**. Ghosting = peor pérdida de tiempo.
+
+- 💀 **Dead post**  
+  - Condición: ≥2 días, 0 interviewing, 50+ proposals.  
+  - Penalización: **-1**. Post viejo y saturado.
+
+- 🎭 **Complot**  
+  - Condición: 20+ proposals, 1 interview, 0 invites.  
+  - Penalización: **-1**. Posible favorito preseleccionado; alerta moderada.
+
+- ⏳ **Time Waster**  
+  - Condición: Entrevista >40% y Hire Rate entre 35% y 50% (se evalúa después de Data Harvesting).  
+  - Penalización: **-1**. Habla con muchos, contrata a pocos.
+
+- ☠️ **Data Harvesting**  
+  - Condición: 1 hire o menos, entrevista >35%, hire rate <25%, cuenta < 6 meses (prioridad sobre Time Waster).  
+  - Penalización: **-1**. Patrón de recolección de datos o estafa/bot.
+
+  > Nota: el porcentaje de entrevista usa la misma fórmula ajustada por invites y unanswered.
+
+- 💀 **Serial Poster**  
+  - Condición: `jobsPosted >= 5` y `hireRateByJobs < 30%` (hires/jobs).  
+  - Penalización: **-1**. Publica mucho y casi no contrata.
+
+- 🤡 **Perpetual Posting**  
+  - Condición: Job abierto > 7 días (postedAt > 7d).  
+  - Penalización: **-1**. Poca urgencia; probablemente solo mirando.
 
 - 📉 **Cheapskate**  
   - Condición: Avg Hourly Paid < $15 **OR** Avg Spend per Job < $100.  
-  - Penalización: **-10.0 pts**. Paga poco, pero paga.
-
-- 🛑 **Crowded room**  
-  - Condición: Interviewing > 7.  
-  - Penalización: **-2.5 pts**. Competencia alta; llegas tarde.
+  - Penalización: **-1**. Paga poco, pero paga.
 
 - 🎣 **Spammer**  
   - Condición: Invites Sent > 15.  
-  - Penalización: **-5.0 pts**. Pesca de arrastre; baja señal.
+  - Penalización: **-1**. Pesca de arrastre; baja señal.
+
+- 🛑 **Crowded room**  
+  - Condición: Interviewing > 7.  
+  - Penalización: **-1**. Competencia alta; llegas tarde.
 
 - 👻 **Ghost job**  
   - Condición: Last Viewed > 48 hours (2 días).  

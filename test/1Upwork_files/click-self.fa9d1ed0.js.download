@@ -1,0 +1,2 @@
+(window.webpackJsonp=window.webpackJsonp||[]).push([[216],{2171:function(e,t,n){"use strict";n.r(t),t.default=function(e,t){const n=new WeakMap,o=o=>{o.target===e&&n.has(o.target)&&t(o)},r=e=>{n.delete(e.target)},d=t=>{t.target===e&&(n.set(t.target,!0),e.addEventListener("scroll",r,{once:!0}),document.addEventListener("mouseup",o,{once:!0}))};return e.addEventListener("mousedown",d),()=>{e.removeEventListener("mousedown",d)}}}}]);
+//# sourceMappingURL=https://upwork-usw2-staging-assets-jsmaps.s3.us-west-2.amazonaws.com/FindWorkHomeNuxt/click-self.fa9d1ed0.js.map

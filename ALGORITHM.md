@@ -1,6 +1,6 @@
-# 🎯 Anderson's Sniper Elite v4.6 — Hardcore Specs
+# 🎯 Anderson's Sniper Elite v4.7 — Hardcore Specs
 
-Documentación oficial del algoritmo de scoring para filtrar trabajos de Upwork. Incluye insumos requeridos, kill switches, puntajes base (con lógica de densidad), penalizaciones tácticas, bonuses por badges buenos y badges clasificados.
+Documentación oficial del algoritmo de scoring para filtrar trabajos de Upwork. Incluye insumos requeridos, kill switches, puntajes base (con lógica de densidad), penalizaciones tácticas (ahora todas restan **-1**) y bonuses (todas suman **+1**) más badges clasificados.
 
 ## 1. Entradas requeridas (JobInput)
 
@@ -11,7 +11,7 @@ Los siguientes datos deben extraerse del contexto del trabajo (Sidebar/Job Detai
 *   **Explicit Stats:** `hireRatePct` (Extracto literal "XX% hire rate", prioridad sobre cálculo manual).
 *   **Rating:** `rating` (0.0–5.0), `reviewsCount`.
 *   **Job Details:** `jobBudget` (USD, para cuentas nuevas), `descriptionLength` (chars).
-*   **Activity:** `proposalCount` (bucket o int), `invitesSent`, `interviewing`.
+*   **Activity:** `proposalCount` (bucket o int), `invitesSent`, `unansweredInvites`, `interviewing`.
 
 ***
 
@@ -59,21 +59,21 @@ Cálculo de componentes normalizados (0-100) ponderados.
 *   Si `rating ≥ 4.8` (y reviews ≥ 3) → **100 pts**.
 *   Si `rating 4.5 – 4.7` (y reviews ≥ 3) → **70 pts**.
 
-### D. Activity (10%) - "Intensidad"
+### D. Activity (10%) - "Intensidad" (interacción + frescura)
 
-*   **< 1 hora:** 100 pts (Super Hot).
-*   **< 3 horas:** 80 pts.
-*   **< 24 horas:** 70 pts.
-*   **< 48 horas:** 60 pts.
-*   **≥ 48 horas:** 0 pts (Ghost).
+*   **A:** Post < 12h **y** interacción (view del cliente o interviewing) → 100 pts.
+*   **B:** Post < 12h **sin** interacción → 85 pts.
+*   **B:** Post < 24h (con o sin interacción; si hay interacción se mantiene B) → 85 pts.
+*   **B:** Post ≥ 24h **con** interacción → 85 pts.
+*   **F:** Post ≥ 24h **sin** interacción → 0 pts.
 
 ### E. Proposals (10%) - "Competencia"
 
-*   **< 5:** 100 pts.
-*   **5 – 10:** 85 pts.
-*   **10 – 20:** 60 pts.
-*   **20 – 50:** 30 pts.
-*   **50+:** 0 pts.
+*   **< 5:** 100 pts (A).
+*   **5 – 10:** 85 pts (B).
+*   **10 – 15:** 70 pts (C).
+*   **> 15 – 50:** 0 pts (F).
+*   **50+:** 0 pts (F).
 
 ### F. Payment Verification (5%)
 
@@ -90,34 +90,44 @@ Cálculo de componentes normalizados (0-100) ponderados.
 
 ***
 
-## 4. Penalizaciones Tácticas (Restas) — v4.6
+## 4. Penalizaciones Tácticas (Restas) — v4.7
 
-Valores ajustados; restan puntos del `BaseScore`.
+Todas restan **-1** al `BaseScore`:
 
-1.  **Window shopper (penalización):** `hireRate < 65%` y `jobsPosted > 3` → **-10.0 pts**. (Ghosting = peor pérdida de tiempo)
-2.  **The Forever Looking:** `postedAt > 4 days` **AND** `interviewing == 0` → **-7.5 pts**. (Trabajo muerto)
-3.  **The Nepo-Hire:** `invitesSent == 1` **AND** `interviewing == 1` → **-7.5 pts**. (Ya eligió a alguien)
-4.  **The Spammer:** `invitesSent > 15` → **-5.0 pts**. (Pesca de arrastre)
-5.  **The Unverified Regular:** `paymentVerified == false` **AND** `jobsPosted > 1` → **-5.0 pts**. (Sin PMV, no es novato)
-6.  **The Crowded Room:** `interviewing > 7` → **-2.5 pts**. (Competencia alta)
-7.  **Cheapskate History:** `avgHourlyPaid > 0 && < $15` **OR** `avgSpendPerJob < $100` → **-10.0 pts**. (Paga poco, pero paga)
-8.  **Lazy Description:** `descriptionLength < 100 chars` → **-2.5 pts**. (Señal de bajo esfuerzo)
+1. **Window shopper:** `hireRate < 65%` y `jobsPosted > 3` (ghosting probable).
+2. **The Forever Looking:** `postedAt > 4 days` **AND** `interviewing == 0` (trabajo muerto).
+3. **Dead post (stale & crowded):** `postedAt >= 2 days` **AND** `interviewing == 0` **AND** `proposalCount >= 50`.
+4. **The Nepo-Hire:** `invitesSent == 1` **AND** `interviewing == 1` (ya tiene elegido).
+5. **The Spammer:** `invitesSent > 15` (pesca de arrastre).
+6. **The Unverified Regular:** `paymentVerified == false` **AND** `jobsPosted > 1`.
+7. **The Crowded Room:** `interviewing > 7` (competencia muy alta).
+8. **Cheapskate History:** `avgHourlyPaid > 0 && < $15` **OR** `avgSpendPerJob < $100`.
+9. **Lazy Description:** `descriptionLength < 100 chars`.
+10. **Complot:** `proposalCount >= 20` **AND** `interviewing == 1` **AND** `invitesSent == 0`.
+11. **Serial Poster:** `jobsPosted >= 5` **AND** `hireRateByJobs < 30%` (hires/jobs).
+12. **Perpetual Posting:** `postedAt > 7 days`.
+13. **Time Waster:** `interviewing / proposals > 40%` **AND** `35% <= hireRate < 50%`.
+14. **Data Harvesting:** `hires <= 1` **AND** `interviewing / proposals > 35%` **AND** `hireRate < 25%` **AND** `memberSince < 6 months`.
 
 ***
 
-## 5. Bonuses por Badges Buenos (Suma) — v4.6
+## 5. Bonuses por Badges Buenos (Suma) — v4.7
 
-Bonos suavizados; se suman al `BaseScore` y luego se clampa a 100.
+Todos los bonuses suman **+1** (clamp a 100):
 
-*   🏅 **Gold standard**: **+5.0 pts** (Hire Rate > 70% AND Spend > $10k AND Rating > 4.8).
-*   🚀 **Elite hire rate**: **+2.5 pts** (Hire Rate ≥ 90%).
-*   🐋 **Whale client**: **+2.5 pts** (`totalSpent > $10k` **OR** `avgSpendPerJob > $1,000`).
-*   🌍 **Tier 1 country**: **+2.5 pts** (País en lista Tier 1).
-*   🔥 **Fresh off the oven**: **+2.5 pts** (Posted < 1 hora).
-*   🏗️ **Team builder**: **0 pts** (solo informativo).
-*   👶 **New client**: **0 pts** (JobsPosted == 0, si sobrevive kill switches).
+* 🏅 **Gold standard**: Hire Rate > 70% **AND** Spend > $10k **AND** Rating > 4.8.
+* 🚀 **Elite hire rate**: Hire Rate ≥ 90%.
+* 🐋 **Whale client**: `totalSpent > $10k` **OR** `avgSpendPerJob > $1,000`.
+* 🌍 **Tier 1 country**: País en lista Tier 1.
+* 🔥 **Fresh off the oven**: Posted < 1 hora.
+* 🤝 **Sociable**: `interviewingRatio > 35%` **AND** `hireRate ≥ 80%` **AND** `rating ≥ 4.8`.
+* 🏗️ **Team builder**: 0 pts (solo informativo, badge).
+* 👶 **New client**: 0 pts (JobsPosted == 0, si sobrevive kill switches).
+* 🚀 **Boost it!**: 0 pts (badge de acción cuando score provisional ≥ 85 y proposals ≥ 10).
 
-**Límite:** `FinalScore = clamp(Base + Bonuses - Penalties, 0, 100)`.
+**Nota sobre interviewingRatio:** `interviewing / (proposalCount + invitesSent − unansweredInvites)` si el denominador > 0; en caso contrario 0. Se usa para Sociable, Time Waster y Data Harvesting.
+
+**Fórmula:** `FinalScore = clamp(Base + Bonuses - Penalties, 0, 100)`.
 
 ***
 
@@ -138,23 +148,29 @@ Bonos suavizados; se suman al `BaseScore` y luego se clampa a 100.
 
 ### 🟢 Good Badges (Green Flags)
 
-*   🏅 **Gold standard**: Hire rate > 70% AND Total Spent > $10k AND Rating > 4.8. (**+5.0 pts**)
-*   🚀 **Elite hire rate**: Hire Rate ≥ 90%. (**+2.5 pts**)
-*   🐋 **Whale client**: TotalSpent > $10k **OR** Avg Spend > $1,000/job. (**+2.5 pts**)
-*   🌍 **Tier 1 country**: País en lista Tier 1 (US, CA, UK, AU, DE, CH, SE, DK, NO, NL, SG, NZ). (**+2.5 pts**)
-*   🔥 **Fresh off the oven**: Posted < 1 hour. (**+2.5 pts**)
-*   🏗️ **Team builder**: TotalHires/JobsPosted > 1.5. (**0 pts**, informativo)
-*   👶 **New client**: JobsPosted == 0 (sobrevive kill switches). (**0 pts**, informativo)
-*   🚀 **Boost it!**: Score provisional (Base + Bonus − Penalty) ≥ 85 **AND** Proposals ≥ 10. (Badge de acción, no suma puntos)
+* 🏅 **Gold standard**: +1 (Hire rate > 70%, Spend > $10k, Rating > 4.8)
+* 🚀 **Elite hire rate**: +1 (Hire rate ≥ 90%)
+* 🐋 **Whale client**: +1 (TotalSpent > $10k **o** Avg Spend > $1k/job)
+* 🌍 **Tier 1:** +1 (País con demanda y buen pago: US, CA, UK, AU, DE, CH, SE, DK, NO, NL, SG, NZ)
+* 🔥 **Fresh off the oven**: +1 (Posted < 1h)
+* 🏗️ **Team builder**: 0 pts (informativo, hires/job > 1.5) — ahora con emoji
+* 👶 **New client**: 0 pts (JobsPosted == 0, si sobrevive kill switches) — ahora con emoji
+* 🚀 **Boost it!**: 0 pts (acción cuando score provisional ≥ 85 y proposals ≥ 10)
 
 ### 🔴 Bad Badges (Red Flags)
 
-*   👀 **Window shopper**: Hire Rate < **65%** (con > 3 jobs). (**-10.0 pts**)
-*   📉 **Cheapskate**: Avg Hourly < $15 OR Avg Spend < $100. (**-10.0 pts**)
-*   🎣 **Spammer**: Invites Sent > 15. (**-5.0 pts**)
-*   🛑 **Crowded room**: Interviewing > 7. (**-2.5 pts**)
-*   👻 **Ghost job**: Last Viewed > 48 horas. (**Kill-switch: score = 0**)
-*   ☢️ **Toxic client**: Rating < 4.5. (**0 pts**, badge/alerta)
+* 👀 **Window shopper**: -1 (Hire rate < 65% con >3 jobs)
+* 💀 **Dead post**: -1 (≥2 días, 0 interviewing, 50+ proposals)
+* 🎭 **Complot**: -1 (20+ proposals, 1 interview, 0 invites)
+* 💀 **Serial Poster**: -1 (`jobsPosted >= 5` y `hireRateByJobs < 30%`)
+* 🤡 **Perpetual Posting**: -1 (`postedAt > 7 días`)
+* 📉 **Cheapskate**: -1 (Avg Hourly < $15 **o** Avg Spend < $100)
+* 🎣 **Spammer**: -1 (Invites Sent > 15)
+* 🛑 **Crowded room**: -1 (Interviewing > 7)
+* 👻 **Ghost job**: Kill-switch (Last Viewed > 48h)
+* ☢️ **Toxic client**: 0 pts (badge/alerta)
+
+**Prioridad (mutuamente excluyentes entre sí):** Sociable > Data Harvesting > Time Waster.
 
 ***
 
