@@ -443,12 +443,18 @@
       const jobCard = this.findJobCardById(this.currentJobId);
       
       if (jobCard) {
-        // Remover solo el overlay previo de ESTA card (no de las otras)
-        jobCard.querySelectorAll('.sniper-overlay').forEach((el) => el.remove());
-        this.injectOverlay(jobCard, result, rawData);
-        logSuccess('Overlay inyectado en la job card');
+        // Remover solo el overlay de ESTE job (no de otros jobs en la misma card si hubiera)
+        const existingOverlay = jobCard.querySelector(`.sniper-overlay[data-job-id="${this.currentJobId}"]`);
+        if (existingOverlay) existingOverlay.remove();
+        
+        // También remover overlay sin job-id (legacy) solo si no hay otro overlay con job-id diferente
+        const legacyOverlay = jobCard.querySelector('.sniper-overlay:not([data-job-id])');
+        if (legacyOverlay) legacyOverlay.remove();
+        
+        this.injectOverlay(jobCard, result, rawData, this.currentJobId);
+        logSuccess(`Overlay inyectado en la job card para ${this.currentJobId}`);
       } else {
-        logError('FASE 2', 'No se encontró la job card para inyectar overlay');
+        logError('FASE 2', `No se encontró la job card para inyectar overlay (job ${this.currentJobId})`);
       }
     }
 
@@ -480,10 +486,15 @@
       return null;
     }
 
-    injectOverlay(card, result, rawData) {
+    injectOverlay(card, result, rawData, jobId = null) {
       // Crear el overlay container
       const overlay = document.createElement('div');
       overlay.className = 'sniper-overlay';
+      
+      // Agregar identificador del job para evitar sobreescrituras
+      if (jobId) {
+        overlay.setAttribute('data-job-id', jobId);
+      }
       
       // Crear badges (solo íconos)
       const badgesContainer = document.createElement('div');
@@ -592,10 +603,15 @@
         const card = link.closest('section.air3-card-section, article.job-tile, [data-test="job-tile"]');
         if (!card || isInsideModal(card)) return;
 
-        // Evitar duplicados
-        if (card.querySelector('.sniper-overlay')) return;
+        // Verificar si ya existe un overlay para ESTE job específico
+        const existingOverlay = card.querySelector(`.sniper-overlay[data-job-id="${jobId}"]`);
+        if (existingOverlay) return;
 
-        this.injectOverlay(card, cached, null);
+        // Si hay un overlay legacy (sin job-id), no lo tocamos para evitar conflictos
+        const legacyOverlay = card.querySelector('.sniper-overlay:not([data-job-id])');
+        if (legacyOverlay) return;
+
+        this.injectOverlay(card, cached, null, jobId);
       });
     }
 

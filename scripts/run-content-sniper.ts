@@ -152,9 +152,9 @@ const extractContentScriptInput = (html: string): JobInput => {
     return tier1.find((c) => text.includes(c));
   };
 
-  const extractPostedTime = (text: string) => {
-    const match = text.match(/Posted\s+(\d+)\s+(minute|hour|day)s?\s+ago/i);
-    if (!match) return new Date();
+  const extractPostedTime = (text: string): Date | undefined => {
+    const match = text.match(/Posted\s+(\d+)\s+(minute|hour|day|week|month)s?\s+ago/i);
+    if (!match) return undefined;
 
     const value = parseInt(match[1], 10);
     const unit = match[2].toLowerCase();
@@ -163,7 +163,9 @@ const extractContentScriptInput = (html: string): JobInput => {
     if (unit.includes('minute')) return new Date(now - value * 60 * 1000);
     if (unit.includes('hour')) return new Date(now - value * 60 * 60 * 1000);
     if (unit.includes('day')) return new Date(now - value * 24 * 60 * 60 * 1000);
-    return new Date();
+    if (unit.includes('week')) return new Date(now - value * 7 * 24 * 60 * 60 * 1000);
+    if (unit.includes('month')) return new Date(now - value * 30 * 24 * 60 * 60 * 1000);
+    return undefined;
   };
 
   const extractAvgHourly = (text: string) => {
@@ -208,4 +210,3 @@ const run = () => {
 };
 
 run();
-

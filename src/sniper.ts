@@ -32,6 +32,11 @@ export interface JobInput {
   proposalCount: number;
   lastViewed: Date;
   invitesSent: number;
+  /**
+   * Pending invites (sent but not answered yet).
+   * Needed to compute interviewing ratio accurately.
+   */
+  unansweredInvites?: number;
   interviewing: number;
   descriptionLength: number;
   clientCountry?: string;
