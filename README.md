@@ -1,4 +1,4 @@
-# Anderson's Sniper - Upwork Job Evaluator
+# Upwork Job Evaluator - Anderson's Sniper 
 
 Extensión MV3 para Chrome/Edge que puntúa y etiqueta ofertas de Upwork en tiempo real usando el core de `sniper.ts`.
 
