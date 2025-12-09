@@ -35,6 +35,11 @@ Todos los bonuses ahora son **+1** (salvo los informativos).
 
   > Nota: el porcentaje de entrevista se calcula como `interviewing / (proposals + invitesSent − unansweredInvites)` si el denominador es > 0.
 
+- 🆘 **SOS**  
+  - Condición: El título o la descripción contiene "Urgency", "Urgent", "Emergency", "Urgencia" o "Emergencia".  
+  - Bonus: 0 pts (informativo).  
+  - Significado: Cliente está desesperado por contratar. Si además tiene muchos invites, se muestra `SOS` en lugar de penalizar como Spammer.
+
 - 🏗️ **Team builder**  
   - Condición: Hires/JobsPosted > 1.5.  
   - Bonus: 0 pts (solo informativo, ahora con emoji).  
@@ -52,6 +57,10 @@ Todos los bonuses ahora son **+1** (salvo los informativos).
 
 🔴 **Badges Malos (Red Flags)**  
 Todas las penalizaciones ahora son **-1** salvo kill-switch.
+
+- 👁️ **Ojo**  
+  - Condición: Historial reciente con reviews ≤ 3 (cliente o freelancer).  
+  - Penalización: **-1**. Con los reviews, puede haber algo ahí.
 
 - 👀 **Window shopper**  
   - Condición: Hire Rate < 65% (con > 3 jobs posted).  
@@ -84,12 +93,12 @@ Todas las penalizaciones ahora son **-1** salvo kill-switch.
   - Penalización: **-1**. Poca urgencia; probablemente solo mirando.
 
 - 📉 **Cheapskate**  
-  - Condición: Avg Hourly Paid < $15 **OR** Avg Spend per Job < $100.  
+  - Condición: Avg Hourly Paid < $6 **OR** Avg Spend per Job < $100.  
   - Penalización: **-1**. Paga poco, pero paga.
 
 - 🎣 **Spammer**  
   - Condición: Invites Sent > 15.  
-  - Penalización: **-1**. Pesca de arrastre; baja señal.
+  - Penalización: **-1**. Pesca de arrastre; baja señal. Si hay badge **SOS**, no se penaliza y se usa **SOS**.
 
 - 🛑 **Crowded room**  
   - Condición: Interviewing > 7.  
@@ -100,6 +109,6 @@ Todas las penalizaciones ahora son **-1** salvo kill-switch.
   - Kill-switch: score = 0. Abandonado.
 
 - ☢️ **Toxic client**  
-  - Condición: Rating < 4.5.  
+  - Condición: Rating < 4.4.  
   - Penalización: 0 pts (solo badge). Señal fuerte de mala experiencia.
 

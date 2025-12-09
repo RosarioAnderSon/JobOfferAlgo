@@ -7,7 +7,7 @@
   // ============================================
 
   const PREFIX = '[🎯 Sniper]';
-  const DEBUG = false;
+  const DEBUG = true;
 
   const colorMap = {
     INIT: '#9C27B0',
@@ -145,16 +145,15 @@
 
         // 🔥 VALIDACIÓN: contenido real del sidebar del cliente
         const sidebarText = clientInfo?.innerText || clientInfo?.textContent || '';
-        const hasRealContent =
-          sidebarText.includes('Member since') ||
-          sidebarText.includes('Payment verified') ||
-          sidebarText.includes('Payment method verified') ||
-          sidebarText.includes('jobs posted') ||
-          sidebarText.includes('total spent') ||
-          sidebarText.includes('hire rate');
+        const sidebarTextLower = sidebarText.toLowerCase();
+        const hasRealContent = ['member since', 'payment verified', 'payment method verified', 'jobs posted', 'total spent', 'hire rate'].some(
+          (token) => sidebarTextLower.includes(token)
+        );
 
         const modalText = jobModal.textContent || '';
-        const hasClientSection = modalText.includes('About the client') || modalText.includes('Member since');
+        const modalTextLower = modalText.toLowerCase();
+        const hasClientSection =
+          modalTextLower.includes('about the client') || modalTextLower.includes('member since');
 
         log(
           'DETAIL',
@@ -248,6 +247,8 @@
 
       const descEl = scope.querySelector('[data-test="Description"], .job-description, .description');
       const descText = descEl?.innerText || descEl?.textContent || '';
+      const titleEl = scope.querySelector('[data-test="job-title"], h1, .job-title');
+      const titleText = titleEl?.innerText || titleEl?.textContent || '';
       const scopeText = scope.innerText || scope.textContent || document.body.innerText || '';
 
       log('DETAIL', `Description length: ${descText.length} chars`);
@@ -266,11 +267,14 @@
         hireRatePct: this.extractHireRate(sidebarText || scopeText),
         rating: this.extractRating(sidebarText || scopeText),
         reviewsCount: this.extractReviews(sidebarText || scopeText),
+        hasLowRecentReview: this.extractHasLowRecentReview(sidebarText || scopeText),
         proposalCount: this.extractProposals(activityText || scopeText),
         lastViewed: this.extractLastViewed(activityText || scopeText),
         invitesSent: this.extractInvites(activityText || scopeText),
         unansweredInvites: this.extractUnansweredInvites(activityText || scopeText),
         interviewing: this.extractInterviewing(activityText || scopeText),
+        jobTitle: titleText.trim() || undefined,
+        descriptionText: descText,
         descriptionLength: descText.trim().length,
         clientCountry: this.extractCountry(sidebarText || scopeText),
         postedAt: this.extractPostedTime(scopeText),
@@ -311,19 +315,45 @@
     }
 
     extractHireRate(text) {
-      const match = text.match(/(\d+)%\s*hire rate/i);
+      const match =
+        text.match(/(\d+)\s*%\s*hire\s*rate/i) ||
+        text.match(/hire\s*rate[:\s]+(\d+)\s*%/i);
       return match ? parseInt(match[1], 10) : 0;
     }
 
     extractRating(text) {
-      // Acepta "4.89 of 21 reviews" o "4.9 of 5"
-      const match = text.match(/(\d\.\d+)\s+of\s+(\d+)\s+reviews/i) || text.match(/(\d\.\d+)\s*of\s*5/i);
+      // Acepta "4.89 of 1,102 reviews" o "4.9 of 5"
+      const match =
+        text.match(/(\d+(?:\.\d+)?)\s+of\s+([\d,]+)\s+reviews/i) ||
+        text.match(/(\d+(?:\.\d+)?)\s*of\s*5/i);
       return match ? parseFloat(match[1]) : 0;
     }
 
     extractReviews(text) {
       const match = text.match(/(\d+)\s*reviews?/i);
       return match ? parseInt(match[1], 10) : 0;
+    }
+
+    extractHasLowRecentReview(text) {
+      const normalized = String(text || '').toLowerCase();
+      const keywords = ['recent', 'history', 'feedback', 'review'];
+      // Busca ratings decimales 0.0–5.0 no precedidos por $ ni seguidos de %
+      const pattern = /(?<![\d$])([0-5](?:\.\d{1,2})?)(?![\d%])/g;
+
+      let match;
+      while ((match = pattern.exec(normalized))) {
+        const value = parseFloat(match[1]);
+        if (Number.isNaN(value) || value > 3.2) continue; // solo bandear <= 3.2
+
+        const windowText = normalized.slice(
+          Math.max(0, match.index - 60),
+          Math.min(normalized.length, match.index + 60)
+        );
+        const hasContext = keywords.some((kw) => windowText.includes(kw));
+        if (hasContext) return true;
+      }
+
+      return false;
     }
 
     extractProposals(text) {
@@ -443,6 +473,10 @@
       const jobCard = this.findJobCardById(this.currentJobId);
       
       if (jobCard) {
+        this.removeOrphanOverlays();
+        // Limpiar overlays de otros jobs (cards recicladas en el feed)
+        this.cleanupOverlays(jobCard, this.currentJobId);
+
         // Remover solo el overlay de ESTE job (no de otros jobs en la misma card si hubiera)
         const existingOverlay = jobCard.querySelector(`.sniper-overlay[data-job-id="${this.currentJobId}"]`);
         if (existingOverlay) existingOverlay.remove();
@@ -484,6 +518,49 @@
 
       // Si no hay coincidencia explícita, no forzar overlay en otra card
       return null;
+    }
+
+    cleanupOverlays(card, targetJobId = null) {
+      if (!card) return;
+
+      // Elimina overlays heredados o de otros jobs si la card fue reutilizada
+      const overlays = Array.from(card.querySelectorAll('.sniper-overlay'));
+      overlays.forEach((overlay) => {
+        const overlayJobId = overlay.getAttribute('data-job-id');
+        const isLegacy = !overlayJobId;
+        const isDifferentJob = targetJobId && overlayJobId && overlayJobId !== targetJobId;
+        if (isLegacy || isDifferentJob) {
+          overlay.remove();
+        }
+      });
+    }
+
+    removeOrphanOverlays() {
+      const isInsideModal = (el) =>
+        el && el.closest('[role="dialog"], .air3-slider-job-details, .job-details-content');
+
+      const overlays = Array.from(document.querySelectorAll('.sniper-overlay'));
+      overlays.forEach((overlay) => {
+        const card = overlay.closest('section.air3-card-section, article.job-tile, [data-test="job-tile"]');
+        if (!card || isInsideModal(card)) {
+          overlay.remove();
+          return;
+        }
+
+        const overlayJobId = overlay.getAttribute('data-job-id');
+        if (!overlayJobId) {
+          overlay.remove();
+          return;
+        }
+
+        const linkForJob = card.querySelector(
+          `a[href*="/details/~${overlayJobId}"], a[href*="~${overlayJobId}"]`
+        );
+
+        if (!linkForJob) {
+          overlay.remove();
+        }
+      });
     }
 
     injectOverlay(card, result, rawData, jobId = null) {
@@ -583,6 +660,7 @@
     }
 
     applyCachedOverlaysToFeed() {
+      this.removeOrphanOverlays();
       const cache = this.loadCache();
       const entries = Object.entries(cache);
       if (entries.length === 0) return;
@@ -602,6 +680,9 @@
 
         const card = link.closest('section.air3-card-section, article.job-tile, [data-test="job-tile"]');
         if (!card || isInsideModal(card)) return;
+
+        // Limpiar overlays de otros jobs si la card fue reciclada
+        this.cleanupOverlays(card, jobId);
 
         // Verificar si ya existe un overlay para ESTE job específico
         const existingOverlay = card.querySelector(`.sniper-overlay[data-job-id="${jobId}"]`);
@@ -733,8 +814,8 @@
         rating:
           result.componentScores.rating === 0
             ? safeData.rating
-              ? `Rating ${safeData.rating}/5 con ${safeData.reviewsCount || 0} reviews`
-              : 'Sin rating / reviews'
+              ? `Rating ${safeData.rating}/5 (<4.4) con ${safeData.reviewsCount || 0} reviews`
+              : 'Sin rating o rating <4.4'
             : '',
         activity:
           result.componentScores.activity === 0
@@ -830,7 +911,7 @@
         Cheapskate: {
           iconSvg: `<svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><defs><linearGradient id="csBody" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" stop-color="#FFF3E0"/><stop offset="100%" stop-color="#FFE0B2"/></linearGradient></defs><path d="M4 10.5c0-1.1.9-2 2-2h9c1.4 0 2.5 1.1 2.5 2.5v4c0 1.1-.9 2-2 2H6c-1.1 0-2-.9-2-2v-4.5Z" fill="url(#csBody)" stroke="#F57F17" stroke-width="1.2" stroke-linejoin="round"/><path d="M7.2 9c0-.6.5-1 1-1h6.5c.6 0 1 .4 1 1v.5h-8.5V9Z" fill="#FFCC80" stroke="#F57F17" stroke-width="1.1"/><path d="M5.5 12.5h2.2c.5 0 .9.4.9.9v.2c0 .5-.4.9-.9.9H5.5" stroke="#F57F17" stroke-width="1.1" stroke-linecap="round"/><circle cx="15.8" cy="12.5" r="1.1" fill="#FFF" stroke="#F57F17" stroke-width="1.1"/><path d="M9 15.5c-.3.6-.8 1-1.5 1-.7 0-1.2-.4-1.5-1" stroke="#F57F17" stroke-width="1.1" stroke-linecap="round"/></svg>`,
           type: 'bad',
-          description: 'Pago menor al promedio menor $100 fixed o $15/hora',
+          description: 'Pago menor al promedio menor $100 fixed o $6/hora',
         },
         'Ghost job': {
           iconSvg: `<svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M7 18c0 1.1-.9 2-2 2v-9c0-4 3-7 7-7s7 3 7 7v9c-1.1 0-2-.9-2-2 0 1.1-.9 2-2 2-.9 0-1.6-.6-1.9-1.4-.3.8-1 1.4-1.9 1.4-1.1 0-2-.9-2-2Z" fill="#ECEFF1" stroke="#607D8B" stroke-width="1.2" stroke-linejoin="round"/><circle cx="10" cy="11" r="1" fill="#263238"/><circle cx="14" cy="11" r="1" fill="#263238"/><path d="M10 14c.5.4 1.1.6 2 .6.9 0 1.5-.2 2-.6" stroke="#455A64" stroke-width="1.1" stroke-linecap="round"/></svg>`,
@@ -860,7 +941,7 @@
         'Toxic client': {
           iconSvg: `<svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M12 3 21 19H3L12 3Z" fill="#FFCDD2" stroke="#D32F2F" stroke-width="1.2"/><path d="M12 10.5v3.5" stroke="#D32F2F" stroke-width="1.4" stroke-linecap="round"/><circle cx="12" cy="16.5" r="0.9" fill="#D32F2F"/></svg>`,
           type: 'bad',
-          description: 'Rating menor a 4.5, posible riesgo de mala experiencia y/o baja califación',
+          description: 'Rating menor a 4.5 o menos de 3 reviews, posible riesgo de mala experiencia',
         },
         'Crowded room': {
           iconSvg: `<svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><defs><linearGradient id="crHead1" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" stop-color="#FFECB3"/><stop offset="100%" stop-color="#FBC02D"/></linearGradient><linearGradient id="crHead2" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" stop-color="#FFE0B2"/><stop offset="100%" stop-color="#FFB74D"/></linearGradient><linearGradient id="crHead3" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" stop-color="#FFE082"/><stop offset="100%" stop-color="#FFCA28"/></linearGradient></defs><circle cx="8" cy="11.5" r="3" fill="url(#crHead1)" stroke="#F9A825" stroke-width="1.1"/><circle cx="13.5" cy="10" r="3" fill="url(#crHead2)" stroke="#FB8C00" stroke-width="1.1"/><circle cx="16.5" cy="14" r="3" fill="url(#crHead3)" stroke="#F57C00" stroke-width="1.1"/><path d="M6.5 15.5c-.2.8-.7 1.3-1.5 1.3-.5 0-1-.2-1.3-.6" stroke="#F57F17" stroke-width="1" stroke-linecap="round"/><path d="M12 13c-.2.8-.7 1.3-1.5 1.3-.6 0-1.1-.3-1.4-.7" stroke="#F57F17" stroke-width="1" stroke-linecap="round"/><path d="M15.5 17c-.2.8-.7 1.3-1.5 1.3-.6 0-1.1-.3-1.4-.7" stroke="#F57F17" stroke-width="1" stroke-linecap="round"/></svg>`,
@@ -872,6 +953,11 @@
           type: 'bad',
           description: 'Invitaciones mayores a 15',
         },
+        SOS: {
+          iconSvg: `<svg width="24" height="24" viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg"><text x="50%" y="50%" text-anchor="middle" dominant-baseline="central" font-family="Inter, Arial, Helvetica, sans-serif" font-size="28" font-weight="800" fill="#FFFFFF">SOS</text></svg>`,
+          type: 'neutral',
+          description: 'Cliente está desesperado por contratar',
+        },
         'Time Waster': {
           iconSvg: `<svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><defs><linearGradient id="twGlass" x1="0%" y1="0%" x2="0%" y2="100%"><stop offset="0%" stop-color="#FFF3E0"/><stop offset="100%" stop-color="#FFE0B2"/></linearGradient></defs><path d="M8 4.5h8" stroke="#F57C00" stroke-width="1.2" stroke-linecap="round"/><path d="M8 19.5h8" stroke="#F57C00" stroke-width="1.2" stroke-linecap="round"/><path d="M9 4.5c0 1.8 1 3.1 2.2 4l1.6 1.2c.5.4.5 1.2 0 1.6L11.2 12c-1.3.9-2.2 2.3-2.2 4v1.5" stroke="#F57C00" stroke-width="1.2" stroke-linecap="round"/><path d="M15 4.5c0 1.8-1 3.1-2.2 4L11.2 9.7c-.5.4-.5 1.2 0 1.6l1.6 1.2c1.3.9 2.2 2.3 2.2 4v1.5" stroke="#F57C00" stroke-width="1.2" stroke-linecap="round"/><path d="M10 9.5h4" stroke="#FB8C00" stroke-width="1.1" stroke-linecap="round"/><path d="M10 14.5h4" stroke="#FB8C00" stroke-width="1.1" stroke-linecap="round"/><rect x="5" y="9" width="3" height="6" rx="1.2" fill="#FFE082" stroke="#FB8C00" stroke-width="1.1"/><path d="M6.5 10.2v3.6" stroke="#F57C00" stroke-width="0.9" stroke-linecap="round"/></svg>`,
           type: 'bad',
@@ -881,6 +967,11 @@
           iconSvg: `<svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><defs><linearGradient id="cpRed" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" stop-color="#FFCDD2"/><stop offset="100%" stop-color="#E53935"/></linearGradient><linearGradient id="cpBlue" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" stop-color="#BBDEFB"/><stop offset="100%" stop-color="#1E88E5"/></linearGradient></defs><path d="M4.2 9.5c0-1 .8-1.8 1.8-1.8h5c1 0 1.8.8 1.8 1.8v5.8c0 1.5-1.8 2.3-3 1.3l-.9-.7c-.45-.4-1.15-.4-1.6 0l-.9.7c-1.2 1-3 .2-3-1.3V9.5Z" fill="url(#cpRed)" stroke="#B71C1C" stroke-width="1.1" stroke-linejoin="round"/><path d="M11.3 6c0-1 .8-1.8 1.8-1.8h5c1 0 1.8.8 1.8 1.8v5.9c0 1.5-1.8 2.3-3 1.3l-.9-.7c-.45-.4-1.15-.4-1.6 0l-.9.7c-1.2 1-3 .2-3-1.3V6Z" fill="url(#cpBlue)" stroke="#0D47A1" stroke-width="1.1" stroke-linejoin="round"/><path d="M7 11.5c.14.32.4.55.72.55.33 0 .6-.23.74-.55" stroke="#B71C1C" stroke-width="1" stroke-linecap="round"/><path d="M9.7 11.5c.14.32.4.55.72.55.33 0 .6-.23.74-.55" stroke="#B71C1C" stroke-width="1" stroke-linecap="round"/><path d="M6.6 12.7c-.35.4-.45.9-.2 1.3.2.35.55.55.96.55.16 0 .32-.02.47-.07" stroke="#1976D2" stroke-width=".9" stroke-linecap="round"/><path d="M7.4 14.2c.48-.4 1.06-.6 1.95-.6.9 0 1.47.2 1.95.6" stroke="#B71C1C" stroke-width="1" stroke-linecap="round"/><path d="M14 9.3c.14.32.4.55.72.55.33 0 .6-.23.74-.55" stroke="#0D47A1" stroke-width="1" stroke-linecap="round"/><path d="M16.7 9.3c.14.32.4.55.72.55.33 0 .6-.23.74-.55" stroke="#0D47A1" stroke-width="1" stroke-linecap="round"/><path d="M14.4 11.6c.55.5 1.25.72 2.1.72.85 0 1.55-.22 2.1-.72" stroke="#0D47A1" stroke-width="1" stroke-linecap="round"/><path d="M12.2 7.2c.34.2.66.5.93.9" stroke="#B71C1C" stroke-width="1" stroke-linecap="round"/><path d="M17.4 5.9c.32.1.63.32.94.62" stroke="#0D47A1" stroke-width="1" stroke-linecap="round"/></svg>`,
           type: 'bad',
           description: '20+ propuestas, 1 entrevista y 0 invites: probable favorito oculto',
+        },
+        Ojo: {
+          iconSvg: `<svg width="24" height="24" viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg"><defs><radialGradient id="eyeGlow" cx="50%" cy="50%" r="50%"><stop offset="0%" stop-color="#FFFFFF" stop-opacity="0.9"/><stop offset="100%" stop-color="#E0E0E0" stop-opacity="0.6"/></radialGradient></defs><ellipse cx="32" cy="32" rx="22" ry="14" fill="url(#eyeGlow)" stroke="#212121" stroke-width="2"/><circle cx="32" cy="32" r="9" fill="#FFFFFF" stroke="#111111" stroke-width="2"/><circle cx="32" cy="32" r="5" fill="#111111"/><circle cx="30" cy="30" r="1.5" fill="#FFFFFF" opacity="0.9"/></svg>`,
+          type: 'bad',
+          description: 'con los reviews, puede haber algo raro ahí...',
         },
         'Data Harvesting': {
           iconSvg: `<svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><defs><linearGradient id="dhShield" x1="0%" y1="0%" x2="0%" y2="100%"><stop offset="0%" stop-color="#FFEBEE"/><stop offset="100%" stop-color="#FFCDD2"/></linearGradient></defs><path d="M12 3 6 5.5v5.4c0 3.4 2.5 6.5 6 7.6 3.5-1.1 6-4.2 6-7.6V5.5L12 3Z" fill="url(#dhShield)" stroke="#C62828" stroke-width="1.2" stroke-linejoin="round"/><path d="M9 9.5c0-.8.6-1.5 1.4-1.5h3.2c.8 0 1.4.7 1.4 1.5 0 .6-.3 1.1-.8 1.3l-2.2 1c-.3.1-.5.4-.5.7v.5" stroke="#C62828" stroke-width="1.1" stroke-linecap="round"/><circle cx="12" cy="15.2" r="0.95" fill="#C62828"/><path d="M8.3 7.5c.3-.9 1-1.5 1.9-1.5h3.6c.9 0 1.6.6 1.9 1.5" stroke="#E57373" stroke-width="1" stroke-linecap="round"/></svg>`,

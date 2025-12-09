@@ -160,6 +160,7 @@ const parseUpworkHTML = (htmlPath: string): JobInput => {
   // ========================================
   const description = $('.job-description, [data-test="Description"]').first().text();
   const descriptionLength = description.trim().length;
+  const jobTitle = $('h1, [data-test="job-title"], .job-title').first().text().trim() || undefined;
 
   return {
     memberSince,
@@ -174,6 +175,8 @@ const parseUpworkHTML = (htmlPath: string): JobInput => {
     lastViewed,
     invitesSent,
     interviewing,
+    jobTitle,
+    descriptionText: description,
     descriptionLength,
     clientCountry,
     avgHourlyPaid,

@@ -5,12 +5,14 @@ export type Badge =
   | 'Fresh off the oven'
   | 'Whale client'
   | 'Elite hire rate'
+  | 'Ojo'
   | 'Cheapskate'
   | 'Window shopper'
   | 'Toxic client'
   | 'Ghost job'
   | 'Crowded room'
   | 'Spammer'
+  | 'SOS'
   | 'Tier 1 country'
   | 'Team builder'
   | 'Boost it!'
@@ -22,6 +24,8 @@ export interface JobInput {
   paymentVerified: boolean;
   totalSpent: number;
   totalHires: number;
+  jobTitle?: string;
+  hasLowRecentReview?: boolean;
   /**
    * Optional explicit hire rate (%) if provided by the source.
    * If present, it overrides the computed (totalHires / jobsPosted) ratio for scoring.
@@ -30,6 +34,7 @@ export interface JobInput {
   rating: number;
   reviewsCount: number;
   proposalCount: number;
+  descriptionText?: string;
   lastViewed: Date;
   invitesSent: number;
   /**
@@ -137,7 +142,7 @@ const spendPoints = (
 };
 
 const ratingPoints = (rating: number, reviewsCount: number) => {
-  if (rating < 4.5) return 0;
+  if (rating < 4.4) return 0;
   if (reviewsCount < 3) return 80;
   if (rating >= 4.8) return 100;
   return 70;
@@ -183,6 +188,19 @@ export const evaluateSniper = (input: JobInput): EvaluationResult => {
   const addBadge = (list: Badge[], badge: Badge) => {
     if (!list.includes(badge)) list.push(badge);
   };
+  const normalizeText = (value: string) =>
+    value
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .toLowerCase();
+  const urgencyText =
+    (input.jobTitle ?? '') + ' ' + (input.descriptionText ?? '');
+  const normalizedUrgencyText = normalizeText(urgencyText);
+  const isUrgentRequest =
+    normalizedUrgencyText.length > 0 &&
+    ['urgency', 'urgent', 'emergency', 'urgencia', 'emergencia', 'urgente'].some(
+      (kw) => normalizedUrgencyText.includes(kw)
+    );
 
   const killSwitches: string[] = [];
   const monthsActive = monthsBetween(input.memberSince, now);
@@ -281,7 +299,11 @@ export const evaluateSniper = (input: JobInput): EvaluationResult => {
     7.5
   );
 
-  pushPenalty(input.invitesSent > 15, 'The Spammer', 5);
+  pushPenalty(
+    input.invitesSent > 15 && !isUrgentRequest,
+    'The Spammer',
+    5
+  );
 
   pushPenalty(
     !input.paymentVerified && input.jobsPosted > 1,
@@ -320,7 +342,7 @@ export const evaluateSniper = (input: JobInput): EvaluationResult => {
   const isHourlyCheap =
     input.avgHourlyPaid !== undefined &&
     input.avgHourlyPaid > 0 &&
-    input.avgHourlyPaid < 15;
+    input.avgHourlyPaid < 6;
   const isGlobalCheap = avgPrice < 100;
   if (isHourlyCheap || isGlobalCheap) {
     penaltiesApplied.push({ name: 'Cheapskate History', points: 10 });
@@ -332,6 +354,14 @@ export const evaluateSniper = (input: JobInput): EvaluationResult => {
   if (windowShopperPenalty) {
     penaltiesApplied.push({ name: 'Window shopper risk', points: 10 });
     addBadge(badges, 'Window shopper');
+  }
+
+  const isToxicClient = input.rating < 4.4;
+
+  const lowRecentReviewPenalty = !!input.hasLowRecentReview && !isToxicClient;
+  if (lowRecentReviewPenalty) {
+    penaltiesApplied.push({ name: 'Ojo con los reviews', points: 5 });
+    addBadge(badges, 'Ojo');
   }
 
   const tier1Countries = [
@@ -393,7 +423,7 @@ export const evaluateSniper = (input: JobInput): EvaluationResult => {
   const finalScore = clamp(round2(tempScore), 0, 100);
   const grade = gradeFromScore(finalScore);
 
-  if (input.rating < 4.5) addBadge(badges, 'Toxic client');
+  if (isToxicClient) addBadge(badges, 'Toxic client');
 
   if (hoursSince(input.lastViewed, now) > 48) {
     addBadge(badges, 'Ghost job');
@@ -403,8 +433,16 @@ export const evaluateSniper = (input: JobInput): EvaluationResult => {
     addBadge(badges, 'Crowded room');
   }
 
+  if (isUrgentRequest) {
+    addBadge(badges, 'SOS');
+  }
+
   if (input.invitesSent > 15) {
-    addBadge(badges, 'Spammer');
+    if (isUrgentRequest) {
+      addBadge(badges, 'SOS');
+    } else {
+      addBadge(badges, 'Spammer');
+    }
   }
 
   if (input.jobsPosted === 0 && !killSwitches.includes('Newbie risk')) {

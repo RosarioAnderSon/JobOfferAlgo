@@ -10,7 +10,7 @@ Los siguientes datos deben extraerse del contexto del trabajo (Sidebar/Job Detai
 *   **Client Stats:** `jobsPosted`, `paymentVerified`, `totalSpent` (USD), `totalHires`, `avgHourlyPaid` (USD/hr), `clientCountry`.
 *   **Explicit Stats:** `hireRatePct` (Extracto literal "XX% hire rate", prioridad sobre cálculo manual).
 *   **Rating:** `rating` (0.0–5.0), `reviewsCount`.
-*   **Job Details:** `jobBudget` (USD, para cuentas nuevas), `descriptionLength` (chars).
+*   **Job Details:** `jobTitle`, `descriptionText` (para detectar urgencia declarada), `jobBudget` (USD, para cuentas nuevas), `descriptionLength` (chars).
 *   **Activity:** `proposalCount` (bucket o int), `invitesSent`, `unansweredInvites`, `interviewing`.
 
 ***
@@ -54,10 +54,10 @@ Cálculo de componentes normalizados (0-100) ponderados.
 
 ### C. Rating (15%) - "Densidad de Reviews"
 
-*   Si `rating < 4.5` → **0 pts** (Toxic).
+*   Si `rating < 4.4` → **0 pts** (Toxic).
 *   Si `reviewsCount < 3` → **80 pts** (Capped por falta de data, aunque sea 5.0).
 *   Si `rating ≥ 4.8` (y reviews ≥ 3) → **100 pts**.
-*   Si `rating 4.5 – 4.7` (y reviews ≥ 3) → **70 pts**.
+*   Si `rating 4.4 – 4.7` (y reviews ≥ 3) → **70 pts**.
 
 ### D. Activity (10%) - "Intensidad" (interacción + frescura)
 
@@ -98,7 +98,7 @@ Todas restan **-1** al `BaseScore`:
 2. **The Forever Looking:** `postedAt > 4 days` **AND** `interviewing == 0` (trabajo muerto).
 3. **Dead post (stale & crowded):** `postedAt >= 2 days` **AND** `interviewing == 0` **AND** `proposalCount >= 50`.
 4. **The Nepo-Hire:** `invitesSent == 1` **AND** `interviewing == 1` (ya tiene elegido).
-5. **The Spammer:** `invitesSent > 15` (pesca de arrastre).
+5. **The Spammer:** `invitesSent > 15` (pesca de arrastre). Si el título o body declaran urgencia (`Urgency/Urgent/Emergency/Urgencia/Emergencia`), no se aplica la penalización y se marca el badge **SOS**.
 6. **The Unverified Regular:** `paymentVerified == false` **AND** `jobsPosted > 1`.
 7. **The Crowded Room:** `interviewing > 7` (competencia muy alta).
 8. **Cheapskate History:** `avgHourlyPaid > 0 && < $15` **OR** `avgSpendPerJob < $100`.
@@ -120,6 +120,7 @@ Todos los bonuses suman **+1** (clamp a 100):
 * 🐋 **Whale client**: `totalSpent > $10k` **OR** `avgSpendPerJob > $1,000`.
 * 🌍 **Tier 1 country**: País en lista Tier 1.
 * 🔥 **Fresh off the oven**: Posted < 1 hora.
+* 🆘 **SOS**: 0 pts (informativo). Detecta keywords de urgencia en título/body. Si hay invites altos, se usa **SOS** en lugar de penalizar Spammer.
 * 🤝 **Sociable**: `interviewingRatio > 35%` **AND** `hireRate ≥ 80%` **AND** `rating ≥ 4.8`.
 * 🏗️ **Team builder**: 0 pts (solo informativo, badge).
 * 👶 **New client**: 0 pts (JobsPosted == 0, si sobrevive kill switches).
@@ -153,6 +154,8 @@ Todos los bonuses suman **+1** (clamp a 100):
 * 🐋 **Whale client**: +1 (TotalSpent > $10k **o** Avg Spend > $1k/job)
 * 🌍 **Tier 1:** +1 (País con demanda y buen pago: US, CA, UK, AU, DE, CH, SE, DK, NO, NL, SG, NZ)
 * 🔥 **Fresh off the oven**: +1 (Posted < 1h)
+* 🆘 **SOS**: 0 pts (informativo; detecta keywords de urgencia y evita penalizar Spammer)
+* 👁️ **Ojo**: -1 (red flag). Historial reciente con reviews ≤ 3; "con los reviews, puede haber algo ahí".
 * 🏗️ **Team builder**: 0 pts (informativo, hires/job > 1.5) — ahora con emoji
 * 👶 **New client**: 0 pts (JobsPosted == 0, si sobrevive kill switches) — ahora con emoji
 * 🚀 **Boost it!**: 0 pts (acción cuando score provisional ≥ 85 y proposals ≥ 10)
@@ -164,8 +167,9 @@ Todos los bonuses suman **+1** (clamp a 100):
 * 🎭 **Complot**: -1 (20+ proposals, 1 interview, 0 invites)
 * 💀 **Serial Poster**: -1 (`jobsPosted >= 5` y `hireRateByJobs < 30%`)
 * 🤡 **Perpetual Posting**: -1 (`postedAt > 7 días`)
-* 📉 **Cheapskate**: -1 (Avg Hourly < $15 **o** Avg Spend < $100)
-* 🎣 **Spammer**: -1 (Invites Sent > 15)
+* 📉 **Cheapskate**: -1 (Avg Hourly < $6 **o** Avg Spend < $100)
+* 🎣 **Spammer**: -1 (Invites Sent > 15; se reemplaza por **SOS** si hay urgencia declarada)
+* 👁️ **Ojo**: -1 (Historial reciente con reviews ≤ 3; con los reviews, puede haber algo ahí)
 * 🛑 **Crowded room**: -1 (Interviewing > 7)
 * 👻 **Ghost job**: Kill-switch (Last Viewed > 48h)
 * ☢️ **Toxic client**: 0 pts (badge/alerta)
@@ -181,4 +185,5 @@ Todos los bonuses suman **+1** (clamp a 100):
 *   **Spend:** Buscar cerca de "total spent" para evitar confundir con budget.
 *   **Proposals:** Normalizar buckets ("Less than 5" → 4, "20 to 50" → 35).
 *   **Country:** Extraer del bloque `data-test="client-country"` y comparar contra la lista Tier 1.
+*   **SOS/Urgencia:** Capturar `jobTitle` (`[data-test="job-title"]`/`h1`) y `descriptionText` para buscar keywords "Urgency/Urgent/Emergency/Urgencia/Emergencia" y decidir si se neutraliza Spammer (badge **SOS**).
 *   **Clamp:** Siempre `FinalScore = clamp(Base + Bonuses − Penalties, 0, 100)`.

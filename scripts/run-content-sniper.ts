@@ -49,6 +49,7 @@ const extractContentScriptInput = (html: string): JobInput => {
 
   const descEl = $('[data-test="Description"], .job-description, .description').first();
   const descText = descEl.text() || '';
+  const titleText = $('[data-test="job-title"], h1, .job-title').first().text() || '';
   const scopeText = $.root().text();
 
   const extractSpent = (text: string) => {
@@ -187,10 +188,12 @@ const extractContentScriptInput = (html: string): JobInput => {
     hireRatePct: extractHireRate(textForInfo) || undefined,
     rating: extractRating(textForInfo),
     reviewsCount: extractReviews(textForInfo),
+    jobTitle: titleText.trim() || undefined,
     proposalCount: extractProposals(activityText || scopeText),
     lastViewed: extractLastViewed(activityText || scopeText),
     invitesSent: extractInvites(activityText || scopeText),
     interviewing: extractInterviewing(activityText || scopeText),
+    descriptionText: descText,
     descriptionLength: descText.trim().length,
     clientCountry: extractCountry(textForInfo),
     postedAt: extractPostedTime(scopeText),

@@ -56,7 +56,7 @@
   };
 
   const ratingPoints = (rating, reviewsCount) => {
-    if (rating < 4.5) return 0;
+    if (rating < 4.4) return 0;
     if (reviewsCount < 3) return 80;
     if (rating >= 4.8) return 100;
     return 70;
@@ -119,6 +119,18 @@
     const addBadge = (list, badge) => {
       if (!list.includes(badge)) list.push(badge);
     };
+    const normalizeText = (value) =>
+      String(value || '')
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .toLowerCase();
+    const urgencyText = `${input.jobTitle || ''} ${input.descriptionText || ''}`;
+    const normalizedUrgencyText = normalizeText(urgencyText);
+    const isUrgentRequest =
+      normalizedUrgencyText.length > 0 &&
+      ['urgency', 'urgent', 'emergency', 'urgencia', 'emergencia', 'urgente'].some(
+        (kw) => normalizedUrgencyText.includes(kw)
+      );
 
     const killSwitches = [];
     const monthsActive = monthsBetween(input.memberSince, now);
@@ -212,7 +224,11 @@
       1
     );
 
-    pushPenalty(input.invitesSent > 15, 'The Spammer', 1);
+    pushPenalty(
+      input.invitesSent > 15 && !isUrgentRequest,
+      'The Spammer',
+      1
+    );
 
     pushPenalty(
       !input.paymentVerified && input.jobsPosted > 1,
@@ -315,7 +331,7 @@
     const isHourlyCheap =
       input.avgHourlyPaid !== undefined &&
       input.avgHourlyPaid > 0 &&
-      input.avgHourlyPaid < 15;
+      input.avgHourlyPaid < 6;
     const isGlobalCheap = avgPrice < 100;
     if (isHourlyCheap || isGlobalCheap) {
       penaltiesApplied.push({ name: 'Cheapskate History', points: 1 });
@@ -327,6 +343,13 @@
     if (windowShopperPenalty) {
       penaltiesApplied.push({ name: 'Window shopper risk', points: 1 });
       addBadge(badges, 'Window shopper');
+    }
+
+    const isToxicClient = input.rating < 4.4;
+
+    if (input.hasLowRecentReview && !isToxicClient) {
+      penaltiesApplied.push({ name: 'Ojo con los reviews', points: 1 });
+      addBadge(badges, 'Ojo');
     }
 
     const tier1Countries = [
@@ -388,7 +411,7 @@
     const finalScore = clamp(round2(tempScore), 0, 100);
     const grade = gradeFromScore(finalScore);
 
-    if (input.rating < 4.5) addBadge(badges, 'Toxic client');
+    if (isToxicClient) addBadge(badges, 'Toxic client');
 
     if (lastViewedDate && hoursSince(lastViewedDate, now) > 48) {
       addBadge(badges, 'Ghost job');
@@ -398,8 +421,16 @@
       addBadge(badges, 'Crowded room');
     }
 
+    if (isUrgentRequest) {
+      addBadge(badges, 'SOS');
+    }
+
     if (input.invitesSent > 15) {
-      addBadge(badges, 'Spammer');
+      if (isUrgentRequest) {
+        addBadge(badges, 'SOS');
+      } else {
+        addBadge(badges, 'Spammer');
+      }
     }
 
     if (input.jobsPosted === 0 && !killSwitches.includes('Newbie risk')) {
