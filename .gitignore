@@ -1,0 +1,25 @@
+# Dependencies
+node_modules/
+
+# Test folder
+test/
+
+# Build artifacts
+*.zip
+dist/
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+npm-debug.log*
+
+# Sniper extension
+sniper-extension.zip
+
