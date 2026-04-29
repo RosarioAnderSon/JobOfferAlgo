@@ -48,7 +48,14 @@
 
 .sniper-badge.neutral {
   background: #1565c0;
-  border-color: #0d3c7a;
+  border-color: #0d47a1;
+  color: #ffffff;
+}
+
+
+.sniper-badge.low-effort {
+  background: #ef6c00;
+  border-color: #d84315;
   color: #ffffff;
 }
 
@@ -94,4 +101,10 @@
   font-size: 11px;
   line-height: 1.35;
   text-align: center;
+  white-space: pre-line;
+}
+
+.sniper-badge-avg .sniper-tooltip {
+  min-width: 230px;
+  max-width: 360px;
 }

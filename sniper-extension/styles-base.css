@@ -86,6 +86,20 @@
   font-size: 11px;
   line-height: 1.35;
 }
+.sniper-settings-select {
+  width: 100%;
+  margin-bottom: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  background: rgba(255, 255, 255, 0.08);
+  color: #fff;
+  border-radius: 6px;
+  padding: 5px 6px;
+  font-size: 11px;
+}
+.sniper-settings-select option {
+  background: #1e1e1e;
+  color: #fff;
+}
 
 .sniper-reset-skills-btn {
   width: 100%;
@@ -121,7 +135,7 @@
   left: 12px;
   top: 120px;
   z-index: 9999;
-  width: 240px;
+  width: 192px;
   max-height: 65vh;
   padding: 10px 12px;
   border-radius: 8px;
@@ -131,6 +145,30 @@
   font-size: 11px;
   line-height: 1.35;
   box-shadow: 0 6px 18px rgba(0, 0, 0, 0.35);
+  transition: transform 0.2s ease, opacity 0.2s ease;
+}
+
+.sniper-global-missing-skills.collapsed {
+  transform: translateX(-172px);
+}
+
+.sniper-left-panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+}
+
+.sniper-left-panel-collapse-btn {
+  border: 1px solid rgba(255, 255, 255, 0.24);
+  background: rgba(255, 255, 255, 0.08);
+  color: #fff;
+  border-radius: 999px;
+  width: 20px;
+  height: 20px;
+  font-size: 13px;
+  line-height: 1;
+  cursor: pointer;
 }
 
 .sniper-global-missing-skills .sniper-left-panel-list {
@@ -152,6 +190,25 @@
   padding-left: 14px;
   max-height: 90px;
   overflow: auto;
+}
+.sniper-left-panel-list li {
+  word-break: break-word;
+}
+.sniper-left-panel-section {
+  margin-top: 6px;
+}
+.sniper-left-panel-section-title {
+  font-size: 10px;
+  font-weight: 700;
+  margin-bottom: 3px;
+}
+.sniper-left-panel-list.sniper-skill-have,
+.sniper-left-panel-section.sniper-skill-have .sniper-left-panel-section-title {
+  color: #8ee6a1;
+}
+.sniper-left-panel-list.sniper-skill-missing,
+.sniper-left-panel-section.sniper-skill-missing .sniper-left-panel-section-title {
+  color: #ff9a9a;
 }
 
 .sniper-settings-feedback a {
@@ -184,3 +241,28 @@ section.air3-card-section {
   position: relative !important;
 }
 
+.sniper-left-panel-filter {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px 6px;
+  margin: 6px 0 8px;
+}
+.sniper-left-panel-filter-label {
+  grid-column: 1 / -1;
+  opacity: 0.9;
+  font-size: 10px;
+}
+.sniper-left-panel-filter-btn {
+  border: 1px solid rgba(255,255,255,0.2);
+  background: rgba(255,255,255,0.1);
+  color: #fff;
+  border-radius: 10px;
+  font-size: 10px;
+  padding: 2px 8px;
+  cursor: pointer;
+  width: 100%;
+}
+.sniper-left-panel-filter-btn.active {
+  background: rgba(30,136,229,0.7);
+  border-color: rgba(142,201,255,0.95);
+}

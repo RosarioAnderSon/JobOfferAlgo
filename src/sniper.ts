@@ -29,7 +29,8 @@ export type Badge =
   | 'Clear Brief'
   | 'Milestone Friendly'
   | 'Professional Tone'
-  | 'First Job $2K+ Scam Risk';
+  | 'First Job $2K+ Scam Risk'
+  | 'Poco esfuerzo';
 
 export interface JobInput {
   memberSince: Date;
@@ -77,6 +78,7 @@ export interface JobInput {
   hasClearBrief?: boolean;
   hasMilestoneFriendly?: boolean;
   hasProfessionalTone?: boolean;
+  hasLowEffortTemplate?: boolean;
   hasJobNoLongerAvailable?: boolean;
   hasHighBudgetNewClientScam?: boolean;
   experienceLevel?: 'entry' | 'intermediate' | 'expert' | null;
@@ -546,6 +548,7 @@ export const evaluateSniper = (input: JobInput): EvaluationResult => {
   if (input.hasSilentHistory) addBadge(badges, 'Silent History');
   if (input.hasBudgetMismatch) addBadge(badges, 'Budget Mismatch');
   if (input.hasHighBudgetNewClientScam) addBadge(badges, 'First Job $2K+ Scam Risk');
+  if (input.hasLowEffortTemplate) addBadge(badges, 'Poco esfuerzo');
 
   return {
     killSwitches,

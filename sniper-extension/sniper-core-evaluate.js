@@ -292,6 +292,9 @@
     if (input.hasHighBudgetNewClientScam) {
       addBadge(badges, 'First Job $2K+ Scam Risk');
     }
+    if (input.hasLowEffortTemplate) {
+      addBadge(badges, 'Poco esfuerzo');
+    }
 
     const penalties = penaltiesApplied.reduce((acc, p) => acc + p.points, 0);
     const bonusPoints = bonusesApplied.reduce((acc, p) => acc + p.points, 0);

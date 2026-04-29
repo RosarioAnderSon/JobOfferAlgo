@@ -1,12 +1,12 @@
-(() => {
+﻿(() => {
   'use strict';
 
   // ============================================
   // ANDERSON'S SNIPER EXTENSION - SPA Ready
-  // Detecta navegaciÃ³n en Upwork sin recargar pÃ¡gina
+  // Detecta navegacion en Upwork sin recargar pagina
   // ============================================
 
-  const PREFIX = '[ðŸŽ¯ Sniper]';
+  const PREFIX = '[Sniper]';
   const DEBUG = true;
 
   const colorMap = {
@@ -19,21 +19,16 @@
   const log = (phase, message, data = null) => {
     if (!DEBUG) return;
     const color = colorMap[phase] || '#666';
-    console.log(
-      `%c${PREFIX} ${phase}:`,
-      `color: ${color}; font-weight: bold`,
-      message,
-      data || ''
-    );
+    console.log(`%c${PREFIX} ${phase}:`, `color: ${color}; font-weight: bold`, message, data || '');
   };
 
   const logSuccess = (message) => {
     if (!DEBUG) return;
-    console.log(`%c${PREFIX} âœ…`, 'color: #66BB6A; font-weight: bold', message);
+    console.log(`%c${PREFIX} OK`, 'color: #66BB6A; font-weight: bold', message);
   };
 
   const logError = (phase, message, error = null) => {
-    console.error(`%c${PREFIX} âŒ ${phase}:`, 'color: #F44336; font-weight: bold', message, error || '');
+    console.error(`%c${PREFIX} ERR ${phase}:`, 'color: #F44336; font-weight: bold', message, error || '');
   };
 
   class UpworkSniperExtension {
@@ -45,6 +40,11 @@
       this.profileSkillsKey = 'sniper-profile-skills-v1';
       this.missingSkillsCounterKey = 'sniper-missing-skills-counter-v1';
       this.missingSkillsSeenJobsKey = 'sniper-missing-skills-seen-jobs-v1';
+      this.missingSkillsByJobKey = 'sniper-missing-skills-by-job-v1';
+      this.missingSkillsMinScoreKey = 'sniper-missing-skills-min-score-v1';
+      this.missingSkillsCollapsedKey = 'sniper-missing-skills-collapsed-v1';
+      this.missingSkillsTopSnapshotKey = 'sniper-missing-skills-top-v1';
+      this.selectedNicheKey = 'sniper-selected-niche-v1';
       this.language = localStorage.getItem(this.languageKey) === 'es' ? 'es' : 'en';
       this.cacheMaxEntries = 200;
       this.cacheMaxAgeMs = 12 * 60 * 60 * 1000; // 12 horas
@@ -56,7 +56,7 @@
     init() {
       this.watchUrlChanges();
       this.checkCurrentPage();
-      // Pintar overlays desde cachÃ© en el feed aunque no abramos el modal
+      // Pintar overlays desde cache en el feed aunque no abramos el modal
       setInterval(() => this.applyCachedOverlaysToFeed(), 1500);
     }
 
@@ -91,15 +91,23 @@
           possibleNames: 'Possible client names',
           possibleNamesNoMatch: "Detected from Client's recent history",
           possibleNamesDetected: '{names}',
-          supportAvgBadge: 'Support Avg/hr',
+          supportAvgBadge: 'Avg/hr',
           supportAvgAbove: 'Above benchmark',
           supportAvgOn: 'On benchmark',
           supportAvgBelow: 'Below benchmark',
           supportAvgUnavailable: 'Benchmark unavailable',
+          niche: 'Niche',
+          nicheCustomerService: 'Customer Service',
+          nicheCustomerSupport: 'Customer Support',
+          nicheCustomerSpecialist: 'Customer Specialist',
           skillsMatchBadge: 'Skills match',
           skillsNeedProfile: 'Open your freelancer profile to load skills, then reopen the job.',
           skillsMissingTitle: 'Missing skills',
           skillsMissingNone: 'No missing skills',
+          skillsMinScoreLabel: 'Min score',
+          skillsMinScore0: '0+',
+          skillsMinScore50: '50+',
+          skillsMinScore80: '80+',
           resetSkills: 'Reset skills counters',
           resetDone: 'Skills counters reset',
           copyEmail: 'Copy email',
@@ -122,28 +130,36 @@
           payment: 'Payment',
           jobsPosted: 'Jobs posted',
           noHiresHistory: 'Sin historial de hires',
-          noSpendHistory: 'Sin gasto historico',
+          noSpendHistory: 'Sin gasto histórico',
           ratingBelow: 'Rating {rating}/5 (<4.0) con {reviews} reviews',
           noRatingBelow: 'Sin rating o rating <4.0',
           seenHoursAgo: 'Visto hace {hours}h',
-          noLastViewed: 'Sin "last viewed" visible (asumido frio)',
+          noLastViewed: 'Sin "last viewed" visible (asumido frío)',
           highCompetition: '{count}+ propuestas (competencia alta)',
           noProposals: 'Propuestas no disponibles (asumidas altas)',
           paymentUnverified: 'Payment no verificado',
           settings: 'Ajustes',
           feedback: 'Enviar feedback a',
           possibleNames: 'Posibles nombres del cliente',
-          possibleNamesNoMatch: "Detectado desde el historial reciente del cliente",
+          possibleNamesNoMatch: 'Detectado desde el historial reciente del cliente',
           possibleNamesDetected: '{names}',
-          supportAvgBadge: 'Support Avg/hr',
+          supportAvgBadge: 'Avg/hr',
           supportAvgAbove: 'Por encima del benchmark',
           supportAvgOn: 'En el benchmark',
           supportAvgBelow: 'Por debajo del benchmark',
           supportAvgUnavailable: 'Benchmark no disponible',
+          niche: 'Niche',
+          nicheCustomerService: 'Customer Service',
+          nicheCustomerSupport: 'Customer Support',
+          nicheCustomerSpecialist: 'Customer Specialist',
           skillsMatchBadge: 'Match de skills',
           skillsNeedProfile: 'Abre tu perfil freelancer para cargar skills y luego vuelve a abrir el job.',
           skillsMissingTitle: 'Skills faltantes',
           skillsMissingNone: 'No faltan skills',
+          skillsMinScoreLabel: 'Score mínimo',
+          skillsMinScore0: '0+',
+          skillsMinScore50: '50+',
+          skillsMinScore80: '80+',
           resetSkills: 'Reset contadores de skills',
           resetDone: 'Contadores de skills reiniciados',
           copyEmail: 'Copiar correo',
@@ -164,7 +180,7 @@
     watchUrlChanges() {
       log('INIT', 'Observando cambios de URL para SPA navigation');
 
-      // popstate para navegaciÃ³n del historial
+      // popstate para navegacion del historial
       window.addEventListener('popstate', () => this.onUrlChange());
 
       // polling como respaldo

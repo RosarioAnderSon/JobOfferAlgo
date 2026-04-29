@@ -234,7 +234,18 @@
         normalized
       );
     },
-    extractProfessionalTone(text) {
+        extractLowEffortTemplate(titleText, descriptionText) {
+      const title = String(titleText || '').trim().toLowerCase();
+      const description = String(descriptionText || '').trim().toLowerCase();
+      return (
+        title.startsWith('job title:') ||
+        title.startsWith('project title:') ||
+        title.startsWith('about the project:') ||
+        description.startsWith('job title:') ||
+        description.startsWith('project title:') ||
+        description.startsWith('about the project:')
+      );
+    },    extractProfessionalTone(text) {
       const normalized = String(text || '').toLowerCase();
       const hasSpecificLanguage = /(requirements|deliverables|timeline|experience needed|tech stack)/i.test(
         normalized

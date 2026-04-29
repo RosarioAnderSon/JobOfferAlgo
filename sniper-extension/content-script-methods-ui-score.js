@@ -120,7 +120,7 @@
         spend:
           result.componentScores.spend === 0
             ? safeData.totalSpent > 0
-              ? `$${Math.round(avgPrice)} por contrataciÃ³n (bajo)`
+              ? `$${Math.round(avgPrice)} por contrataci\u00f3n (bajo)`
               : this.t('noSpendHistory')
             : '',
         rating:
@@ -161,6 +161,9 @@
       const config = this.getBadgeConfig(badgeName, rawData);
       const badgeEl = document.createElement('span');
       badgeEl.className = `sniper-badge ${config.type}`;
+      if (badgeName === 'Niche Avg/hr') {
+        badgeEl.classList.add('sniper-badge-avg');
+      }
 
       if (config.iconSvg) {
         badgeEl.innerHTML = config.iconSvg;
@@ -168,7 +171,7 @@
         badgeEl.textContent = config.icon || '';
       }
 
-      // Tooltip HTML con jerarquÃ­a (tÃ­tulo + descripciÃ³n)
+      // Tooltip HTML con jerarqu\u00eda (t\u00edtulo + descripci\u00f3n)
       const tooltipEl = document.createElement('div');
       tooltipEl.className = 'sniper-tooltip';
       const titleEl = document.createElement('div');
