@@ -4,7 +4,12 @@
   "private": true,
   "scripts": {
     "test-html": "ts-node --project tsconfig.json scripts/run-html-sniper.ts",
-    "test-content": "ts-node --project tsconfig.json scripts/run-content-sniper.ts"
+    "test-content": "ts-node --project tsconfig.json scripts/run-content-sniper.ts",
+    "check-sniper-lines": "node scripts/check-sniper-lines.js",
+    "check-sniper-parity": "node scripts/check-sniper-parity.js",
+    "check-sniper-ui-parity": "node scripts/check-sniper-ui-parity.js",
+    "check-sniper-encoding": "node scripts/check-sniper-encoding.js",
+    "check-sniper-guardrails": "npm run check-sniper-lines && npm run check-sniper-parity && npm run check-sniper-ui-parity && npm run check-sniper-encoding"
   },
   "devDependencies": {
     "@types/cheerio": "^0.22.35",

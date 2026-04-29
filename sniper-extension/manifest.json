@@ -13,12 +13,25 @@
         "https://www.upwork.com/freelancers/*"
       ],
       "js": [
+        "sniper-core-shared.js",
+        "sniper-core-evaluate.js",
         "sniper-core.js",
+        "extractors-names.js",
         "extractors.js",
+        "content-script-base.js",
+        "content-script-methods-skills-core.js",
+        "content-script-methods-skills-analytics.js",
+        "content-script-methods-flow-route.js",
+        "content-script-methods-flow-overlay.js",
+        "content-script-methods-cache.js",
+        "content-script-methods-ui-score.js",
+        "content-script-methods-ui-badges.js",
         "content-script.js"
       ],
       "css": [
-        "styles.css"
+        "styles-base.css",
+        "styles-overlay-a.css",
+        "styles-overlay-b.css"
       ],
       "run_at": "document_idle"
     }

@@ -28,7 +28,8 @@ export type Badge =
   | 'Budget Mismatch'
   | 'Clear Brief'
   | 'Milestone Friendly'
-  | 'Professional Tone';
+  | 'Professional Tone'
+  | 'First Job $2K+ Scam Risk';
 
 export interface JobInput {
   memberSince: Date;
@@ -77,6 +78,7 @@ export interface JobInput {
   hasMilestoneFriendly?: boolean;
   hasProfessionalTone?: boolean;
   hasJobNoLongerAvailable?: boolean;
+  hasHighBudgetNewClientScam?: boolean;
   experienceLevel?: 'entry' | 'intermediate' | 'expert' | null;
   now?: Date;
 }
@@ -253,6 +255,9 @@ export const evaluateSniper = (input: JobInput): EvaluationResult => {
   if (input.hasJobNoLongerAvailable) {
     killSwitches.push('Job no longer available');
   }
+  if (input.hasHighBudgetNewClientScam) {
+    killSwitches.push('First-job $2k+ scam risk');
+  }
 
   if (killSwitches.length > 0) {
     return {
@@ -373,6 +378,7 @@ export const evaluateSniper = (input: JobInput): EvaluationResult => {
   pushPenalty(!!input.hasFreeConsultant, 'Free Consultant', 1);
   pushPenalty(!!input.hasSilentHistory, 'Silent History', 1);
   pushPenalty(!!input.hasBudgetMismatch, 'Budget Mismatch', 1);
+  pushPenalty(!!input.hasHighBudgetNewClientScam, 'First-job $2k+ scam risk', 2);
 
   const effectiveHireRatePct =
     input.hireRatePct !== undefined
@@ -539,6 +545,7 @@ export const evaluateSniper = (input: JobInput): EvaluationResult => {
   if (input.hasFreeConsultant) addBadge(badges, 'Free Consultant');
   if (input.hasSilentHistory) addBadge(badges, 'Silent History');
   if (input.hasBudgetMismatch) addBadge(badges, 'Budget Mismatch');
+  if (input.hasHighBudgetNewClientScam) addBadge(badges, 'First Job $2K+ Scam Risk');
 
   return {
     killSwitches,

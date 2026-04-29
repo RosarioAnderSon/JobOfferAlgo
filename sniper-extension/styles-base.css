@@ -1,0 +1,186 @@
+/* ============================================ */
+/* ANDERSON'S SNIPER EXTENSION - Styles        */
+/* ============================================ */
+
+/* Sniper Overlay: contenedor principal en la card */
+.sniper-overlay {
+  position: absolute;
+  right: 12px;
+  bottom: 10px;
+  top: auto !important;
+  transform: none !important;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  z-index: 100;
+  pointer-events: auto;
+}
+
+.sniper-settings-wrap {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.sniper-settings-btn {
+  width: 24px;
+  height: 24px;
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  background: rgba(20, 20, 20, 0.75);
+  color: #fff;
+  border-radius: 999px;
+  cursor: pointer;
+  font-size: 13px;
+  line-height: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.sniper-settings-panel {
+  position: absolute;
+  right: 0;
+  bottom: 30px;
+  width: 220px;
+  padding: 10px;
+  border-radius: 8px;
+  background: rgba(18, 18, 18, 0.95);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  color: #fff;
+  display: none;
+  z-index: 1200;
+}
+
+.sniper-settings-panel.open {
+  display: block;
+}
+
+.sniper-settings-label {
+  font-size: 11px;
+  margin-bottom: 6px;
+  opacity: 0.9;
+}
+
+.sniper-settings-lang-row {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 8px;
+}
+
+.sniper-lang-btn {
+  flex: 1;
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  background: rgba(255, 255, 255, 0.08);
+  color: #fff;
+  border-radius: 6px;
+  padding: 4px 0;
+  cursor: pointer;
+  font-size: 11px;
+}
+
+.sniper-lang-btn.active {
+  background: rgba(30, 136, 229, 0.5);
+}
+
+.sniper-settings-feedback {
+  font-size: 11px;
+  line-height: 1.35;
+}
+
+.sniper-reset-skills-btn {
+  width: 100%;
+  margin-top: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  background: rgba(255, 255, 255, 0.08);
+  color: #fff;
+  border-radius: 6px;
+  padding: 5px 8px;
+  cursor: pointer;
+  font-size: 11px;
+  text-align: center;
+}
+
+.sniper-left-panel {
+  position: absolute;
+  left: 12px;
+  bottom: 10px;
+  z-index: 100;
+  min-width: 180px;
+  max-width: 280px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  background: rgba(18, 18, 18, 0.92);
+  color: #fff;
+  font-size: 11px;
+  line-height: 1.35;
+}
+
+.sniper-global-missing-skills {
+  position: fixed;
+  left: 12px;
+  top: 120px;
+  z-index: 9999;
+  width: 240px;
+  max-height: 65vh;
+  padding: 10px 12px;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  background: rgba(18, 18, 18, 0.92);
+  color: #fff;
+  font-size: 11px;
+  line-height: 1.35;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.35);
+}
+
+.sniper-global-missing-skills .sniper-left-panel-list {
+  max-height: calc(65vh - 42px);
+}
+
+.sniper-left-panel-title {
+  font-weight: 700;
+  font-size: 11px;
+  margin-bottom: 4px;
+}
+
+.sniper-left-panel-msg {
+  opacity: 0.95;
+}
+
+.sniper-left-panel-list {
+  margin: 0;
+  padding-left: 14px;
+  max-height: 90px;
+  overflow: auto;
+}
+
+.sniper-settings-feedback a {
+  color: #8ec9ff;
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.sniper-settings-copy-status {
+  min-height: 14px;
+  margin-top: 4px;
+  font-size: 10px;
+  color: #9be7a5;
+}
+
+.sniper-settings-copy-status.is-error {
+  color: #ff9e9e;
+}
+
+/* Asegurar prioridad dentro de la card */
+section.air3-card-section .sniper-overlay {
+  top: auto !important;
+  bottom: 10px !important;
+  right: 12px;
+  transform: none !important;
+}
+
+/* Hacer la card padre relativa para posicionar el overlay */
+section.air3-card-section {
+  position: relative !important;
+}
+
