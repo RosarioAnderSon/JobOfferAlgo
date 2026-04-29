@@ -37,9 +37,19 @@ How to use:
   - Urgency keywords detected; can neutralize `Spammer`.
 - `Possible client names` (info)
   - Names extracted from `Client's recent history` only.
+- `Support Avg/hr` (info)
+  - For support niche jobs (`Customer Service/Support/Specialist`), compares hourly signal against feed benchmark.
+  - Status: `Above benchmark`, `On benchmark`, `Below benchmark`, or `Benchmark unavailable`.
+- `Skills match` (info)
+  - Compares required job skills vs freelancer profile skills loaded from `/freelancers/...`.
+  - If profile skills are missing, badge instructs opening profile first, then reopening the job.
 
 Interview ratio note:
 `interviewing / (proposals + invitesSent - unansweredInvites)` when denominator > 0.
+
+Skills counters note:
+Missing skills are shown in a left-side panel on the JobCard with accumulated counter `x#` per skill.
+Counters and cached profile skills persist manually in local storage and can be reset from Settings.
 
 ### Red Flags
 

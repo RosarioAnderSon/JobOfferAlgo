@@ -43,7 +43,7 @@
     if (!scope) return null;
     const headingNodes = Array.from(scope.querySelectorAll('h2, h3, h4, h5, strong, span, div'));
     const heading = headingNodes.find((el) =>
-      /client'?s recent history/i.test((el.textContent || '').trim())
+      /client(?:['’`])?s recent history/i.test((el.textContent || '').trim())
     );
     if (!heading) return null;
     return (
@@ -100,11 +100,39 @@
       'saas',
       'auth',
     ]);
+    const blockedNameLikeWords = new Set([
+      'straightforward',
+      'simple',
+      'quick',
+      'professional',
+      'friendly',
+      'responsive',
+      'clear',
+      'amazing',
+      'great',
+      'good',
+      'excellent',
+      'easy',
+    ]);
+    const blockedFollowingNouns = new Set([
+      'project',
+      'task',
+      'job',
+      'work',
+      'assignment',
+      'role',
+      'position',
+      'request',
+      'gig',
+      'scope',
+    ]);
     const nameToken = "[A-Z](?:[A-Za-z'-]*[A-Za-z])?|[A-Z]\\.";
     const nameCapture = `((?:${nameToken})(?:\\s+(?:${nameToken})){0,3})`;
     const nameBoundary = '(?=[\\s,.;:!?)]|$)';
     const patterns = [
       new RegExp(`\\b(?:[Ww]orking|[Ww]orked|[Ww]ork)\\s+[Ww]ith\\s+(?:(?:[Mm]r|[Mm]rs|[Mm]s|[Mm]iss|[Dd]r)\\.?\\s+)?${nameCapture}${nameBoundary}`, 'g'),
+      new RegExp(`\\b(?:[Gg]reat|[Nn]ice|[Aa]wesome|[Ee]xcellent)\\s+[Ww]orking\\s+[Ww]ith\\s+(?:(?:[Mm]r|[Mm]rs|[Mm]s|[Mm]iss|[Dd]r)\\.?\\s+)?${nameCapture}${nameBoundary}`, 'g'),
+      new RegExp(`\\b[Ii]t\\s+[Ww]as\\s+(?:[Rr]eally\\s+)?(?:[Gg]reat|[Nn]ice)\\s+[Ww]orking\\s+[Ww]ith\\s+(?:(?:[Mm]r|[Mm]rs|[Mm]s|[Mm]iss|[Dd]r)\\.?\\s+)?${nameCapture}${nameBoundary}`, 'g'),
       new RegExp(`\\b(?:[Ii]\\s+[Aa]m\\s+[A-Za-z\\s]{0,35}?(?:[Gg]lad|[Hh]appy)\\s+[Tt]o\\s+[Ww]ork|(?:[Ii]\\s+)?(?:[Ee]njoyed|[Ee]njoy)\\s+[Ww]orking|[Ii]t\\s+[Ww]as\\s+(?:[Ss]uch\\s+[Aa]\\s+)?[Pp]leasure\\s+[Ww]orking|[Ii]t\\s+[Ww]as\\s+(?:[Mm]y\\s+)?[Pp]leasure\\s+[Tt]o\\s+[Ww]ork)\\s+[Ww]ith\\s+(?:(?:[Mm]r|[Mm]rs|[Mm]s|[Mm]iss|[Dd]r)\\.?\\s+)?${nameCapture}${nameBoundary}`, 'g'),
       new RegExp(`\\b${nameCapture}\\s+(?:[Ii]s|[Ww]as)\\s+[A-Za-z\\s]{0,20}?[Tt]o\\s+[Ww]ork\\s+[Ww]ith\\b`, 'g'),
       new RegExp(`\\b${nameCapture}\\s+(?:[Ii]s|[Ww]as)\\s+[Oo]ne\\s+[Oo]f\\s+[Tt]he\\s+[Bb]est\\s+[Cc]lients?\\b`, 'g'),
@@ -123,6 +151,12 @@
         .replace(/\s+\b(?:to|and|or|but|with|for|from)\b$/i, '')
         .replace(/\s+/g, ' ')
         .trim();
+
+    const cleanRecentHistoryItemText = (value) =>
+      String(value || '')
+        .split(/\r?\n/)
+        .filter((line) => !/^\s*to freelancer\s*:/i.test(line))
+        .join('\n');
 
     const registerFreelancerName = (value) => {
       const normalized = normalizeCandidate(value).toLowerCase();
@@ -148,13 +182,14 @@
     }
     collectFreelancerNamesFromText(section.innerText || section.textContent || '');
 
-    const isLikelyName = (value) => {
+    const isLikelyName = (value, contextText) => {
       if (!value) return false;
       const parts = value.split(' ').filter(Boolean);
       if (!parts.length || parts.length > 4) return false;
       if (!parts.every((part) => /^([A-Z](?:[A-Za-z'-]*[A-Za-z])?|[A-Z]\.)$/.test(part))) return false;
       if (parts.some((part) => blockedTokens.has(part.toLowerCase()))) return false;
       if (parts.some((part) => blockedTechnicalTokens.has(part.toLowerCase()))) return false;
+      if (parts.some((part) => blockedNameLikeWords.has(part.toLowerCase()))) return false;
       if (parts.some((part) => /[0-9]/.test(part))) return false;
       if (parts.some((part) => /^[A-Z]{2,}\.?$/.test(part))) return false;
       if (parts.some((part) => !/[a-z]/.test(part))) return false;
@@ -165,12 +200,20 @@
       if (freelancerNameSet.has(joined)) return false;
       const firstToken = parts[0].toLowerCase();
       if (freelancerFirstTokenSet.has(firstToken)) return false;
+      if (parts.length === 1 && contextText) {
+        const escaped = value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        const afterTokenMatch = new RegExp(`\\b${escaped}\\b\\s+([A-Za-z]{3,})`, 'i').exec(contextText);
+        if (afterTokenMatch) {
+          const nextWord = String(afterTokenMatch[1] || '').toLowerCase();
+          if (blockedFollowingNouns.has(nextWord)) return false;
+        }
+      }
       return true;
     };
 
-    const addCandidate = (rawCandidate, target) => {
+    const addCandidate = (rawCandidate, contextText, target) => {
       const candidate = normalizeCandidate(rawCandidate);
-      if (!isLikelyName(candidate)) return;
+      if (!isLikelyName(candidate, contextText)) return;
       const normalized = candidate.toLowerCase();
       if (target.some((name) => name.toLowerCase() === normalized)) return;
       target.push(candidate);
@@ -179,14 +222,15 @@
     const found = [];
     for (const item of sourceItems) {
       if (found.length >= MAX_CLIENT_NAMES) break;
-      const itemText = normalizeText(item.innerText || item.textContent || '');
+      const rawItemText = item.innerText || item.textContent || '';
+      const itemText = normalizeText(cleanRecentHistoryItemText(rawItemText));
       if (!itemText) continue;
 
       for (const pattern of patterns) {
         pattern.lastIndex = 0;
         let match;
         while ((match = pattern.exec(itemText)) && found.length < MAX_CLIENT_NAMES) {
-          addCandidate(match[1], found);
+          addCandidate(match[1], itemText, found);
         }
       }
     }

@@ -9,7 +9,8 @@
   "content_scripts": [
     {
       "matches": [
-        "https://www.upwork.com/nx/*"
+        "https://www.upwork.com/nx/*",
+        "https://www.upwork.com/freelancers/*"
       ],
       "js": [
         "sniper-core.js",
