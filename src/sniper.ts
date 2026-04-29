@@ -16,7 +16,19 @@ export type Badge =
   | 'Tier 1 country'
   | 'Team builder'
   | 'Boost it!'
-  | 'New client';
+  | 'New client'
+  | 'Off-platform request'
+  | 'External payment risk'
+  | 'Free work request'
+  | 'Too good to be true'
+  | 'Possible client names'
+  | 'Scope Monster'
+  | 'Free Consultant'
+  | 'Silent History'
+  | 'Budget Mismatch'
+  | 'Clear Brief'
+  | 'Milestone Friendly'
+  | 'Professional Tone';
 
 export interface JobInput {
   memberSince: Date;
@@ -52,6 +64,20 @@ export interface JobInput {
    * Used for the Cheapskate badge/penalty.
    */
   avgHourlyPaid?: number;
+  hasOffPlatformContact?: boolean;
+  hasExternalPaymentRequest?: boolean;
+  hasFreeWorkRequest?: boolean;
+  isTooGoodToBeTrue?: boolean;
+  possibleClientNames?: string[];
+  hasScopeMonster?: boolean;
+  hasFreeConsultant?: boolean;
+  hasSilentHistory?: boolean;
+  hasBudgetMismatch?: boolean;
+  hasClearBrief?: boolean;
+  hasMilestoneFriendly?: boolean;
+  hasProfessionalTone?: boolean;
+  hasJobNoLongerAvailable?: boolean;
+  experienceLevel?: 'entry' | 'intermediate' | 'expert' | null;
   now?: Date;
 }
 
@@ -80,6 +106,7 @@ export interface EvaluationResult {
 
 const MS_PER_DAY = 86_400_000;
 const MS_PER_HOUR = 3_600_000;
+const LOW_REVIEW_TOXIC_THRESHOLD = 2;
 
 const clamp = (value: number, min: number, max: number) =>
   Math.min(max, Math.max(min, value));
@@ -142,7 +169,7 @@ const spendPoints = (
 };
 
 const ratingPoints = (rating: number, reviewsCount: number) => {
-  if (rating < 4.4) return 0;
+  if (rating < 4.0) return 0;
   if (reviewsCount < 3) return 80;
   if (rating >= 4.8) return 100;
   return 70;
@@ -206,10 +233,13 @@ export const evaluateSniper = (input: JobInput): EvaluationResult => {
   const monthsActive = monthsBetween(input.memberSince, now);
   const daysSinceViewed = daysSince(input.lastViewed, now);
 
-  if (
-    monthsActive < 5 &&
-    (!input.paymentVerified || input.jobsPosted === 0)
-  ) {
+  const isNewbieRisk =
+    monthsActive < 3 &&
+    !input.paymentVerified &&
+    input.jobsPosted === 0 &&
+    input.totalSpent === 0 &&
+    input.descriptionLength < 80;
+  if (isNewbieRisk) {
     killSwitches.push('Newbie risk');
   }
 
@@ -219,6 +249,9 @@ export const evaluateSniper = (input: JobInput): EvaluationResult => {
 
   if (!input.paymentVerified && input.totalSpent === 0) {
     killSwitches.push('Unverified & broke');
+  }
+  if (input.hasJobNoLongerAvailable) {
+    killSwitches.push('Job no longer available');
   }
 
   if (killSwitches.length > 0) {
@@ -321,6 +354,25 @@ export const evaluateSniper = (input: JobInput): EvaluationResult => {
   );
 
   pushPenalty(input.descriptionLength < 100, 'Lazy Description', 2.5);
+  pushPenalty(
+    !!input.hasOffPlatformContact,
+    'Off-platform contact request',
+    2.5
+  );
+  pushPenalty(
+    !!input.hasFreeWorkRequest,
+    'Free work request',
+    2.5
+  );
+  pushPenalty(
+    !!input.hasExternalPaymentRequest,
+    'External payment risk',
+    2
+  );
+  pushPenalty(!!input.hasScopeMonster, 'Scope Monster', 1);
+  pushPenalty(!!input.hasFreeConsultant, 'Free Consultant', 1);
+  pushPenalty(!!input.hasSilentHistory, 'Silent History', 1);
+  pushPenalty(!!input.hasBudgetMismatch, 'Budget Mismatch', 1);
 
   const effectiveHireRatePct =
     input.hireRatePct !== undefined
@@ -356,7 +408,12 @@ export const evaluateSniper = (input: JobInput): EvaluationResult => {
     addBadge(badges, 'Window shopper');
   }
 
-  const isToxicClient = input.rating < 4.4;
+  const hasClientRating = Number.isFinite(input.rating) && input.rating > 0;
+  const hasLowReviewCount =
+    Number.isFinite(input.reviewsCount) &&
+    input.reviewsCount > 0 &&
+    input.reviewsCount <= LOW_REVIEW_TOXIC_THRESHOLD;
+  const isToxicClient = (hasClientRating && input.rating < 4.0) || hasLowReviewCount;
 
   const lowRecentReviewPenalty = !!input.hasLowRecentReview && !isToxicClient;
   if (lowRecentReviewPenalty) {
@@ -393,7 +450,8 @@ export const evaluateSniper = (input: JobInput): EvaluationResult => {
   pushBonus(goldStandard, 'Gold standard bonus', 5, 'Gold standard');
 
   pushBonus(
-    effectiveHireRatePct >= 90,
+    effectiveHireRatePct >= 90 &&
+      (input.jobsPosted >= 5 || input.totalHires >= 3),
     'Elite hire rate bonus',
     2.5,
     'Elite hire rate'
@@ -408,10 +466,27 @@ export const evaluateSniper = (input: JobInput): EvaluationResult => {
     2.5,
     'Fresh off the oven'
   );
+  pushBonus(!!input.hasClearBrief, 'Clear Brief bonus', 1, 'Clear Brief');
+  pushBonus(
+    !!input.hasMilestoneFriendly,
+    'Milestone Friendly bonus',
+    1,
+    'Milestone Friendly'
+  );
+  pushBonus(
+    !!input.hasProfessionalTone,
+    'Professional Tone bonus',
+    1,
+    'Professional Tone'
+  );
 
   const teamBuilder =
     input.jobsPosted > 0 && input.totalHires / input.jobsPosted > 1.5;
   if (teamBuilder) addBadge(badges, 'Team builder');
+  if (input.isTooGoodToBeTrue) {
+    penaltiesApplied.push({ name: 'Too good to be true', points: 1.5 });
+    addBadge(badges, 'Too good to be true');
+  }
 
   const penalties = penaltiesApplied.reduce((acc, p) => acc + p.points, 0);
   const bonusPoints = bonusesApplied.reduce((acc, p) => acc + p.points, 0);
@@ -448,6 +523,22 @@ export const evaluateSniper = (input: JobInput): EvaluationResult => {
   if (input.jobsPosted === 0 && !killSwitches.includes('Newbie risk')) {
     addBadge(badges, 'New client');
   }
+  if (input.hasOffPlatformContact) {
+    addBadge(badges, 'Off-platform request');
+  }
+  if (input.hasExternalPaymentRequest) {
+    addBadge(badges, 'External payment risk');
+  }
+  if (input.hasFreeWorkRequest) {
+    addBadge(badges, 'Free work request');
+  }
+  if (input.possibleClientNames && input.possibleClientNames.length > 0) {
+    addBadge(badges, 'Possible client names');
+  }
+  if (input.hasScopeMonster) addBadge(badges, 'Scope Monster');
+  if (input.hasFreeConsultant) addBadge(badges, 'Free Consultant');
+  if (input.hasSilentHistory) addBadge(badges, 'Silent History');
+  if (input.hasBudgetMismatch) addBadge(badges, 'Budget Mismatch');
 
   return {
     killSwitches,
@@ -464,4 +555,3 @@ export const evaluateSniper = (input: JobInput): EvaluationResult => {
     },
   };
 };
-

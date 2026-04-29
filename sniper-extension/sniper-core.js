@@ -3,6 +3,7 @@
 
   const MS_PER_DAY = 86_400_000;
   const MS_PER_HOUR = 3_600_000;
+  const LOW_REVIEW_TOXIC_THRESHOLD = 2;
 
   const clamp = (value, min, max) => Math.min(max, Math.max(min, value));
   const round2 = (value) => Math.round(value * 100) / 100;
@@ -56,7 +57,7 @@
   };
 
   const ratingPoints = (rating, reviewsCount) => {
-    if (rating < 4.4) return 0;
+    if (rating < 4.0) return 0;
     if (reviewsCount < 3) return 80;
     if (rating >= 4.8) return 100;
     return 70;
@@ -140,19 +141,29 @@
         : null;
     const daysSinceViewed = lastViewedDate ? daysSince(lastViewedDate, now) : null;
 
-    if (
-      monthsActive < 5 &&
-      (!input.paymentVerified || input.jobsPosted === 0)
-    ) {
+    const isNewbieRisk =
+      monthsActive < 3 &&
+      !input.paymentVerified &&
+      input.jobsPosted === 0 &&
+      input.totalSpent === 0 &&
+      (input.descriptionLength ?? 0) < 80;
+    if (isNewbieRisk) {
       killSwitches.push('Newbie risk');
     }
 
-    if (daysSinceViewed !== null && daysSinceViewed > 2) {
+    // Ghost job KillSwitch: SOLO si daysSinceViewed > 2 Y NO hay entrevistas activas
+    // Si hay interviewing > 0, es probable shortlisting, no abandono
+    const interviewingCount = input.interviewing ?? 0;
+    const isGhostJob = daysSinceViewed !== null && daysSinceViewed > 2 && interviewingCount === 0;
+    if (isGhostJob) {
       killSwitches.push('Ghost job');
     }
 
     if (!input.paymentVerified && input.totalSpent === 0) {
       killSwitches.push('Unverified & broke');
+    }
+    if (input.hasJobNoLongerAvailable) {
+      killSwitches.push('Job no longer available');
     }
 
     if (killSwitches.length > 0) {
@@ -253,6 +264,25 @@
     pushPenalty(isDeadPost, 'Dead post (stale & crowded)', 1);
 
     pushPenalty(input.descriptionLength < 100, 'Lazy Description', 1);
+    pushPenalty(
+      !!input.hasOffPlatformContact,
+      'Off-platform contact request',
+      2
+    );
+    pushPenalty(
+      !!input.hasFreeWorkRequest,
+      'Free work request',
+      2
+    );
+    pushPenalty(
+      !!input.hasExternalPaymentRequest,
+      'External payment risk',
+      2
+    );
+    pushPenalty(!!input.hasScopeMonster, 'Scope Monster', 1);
+    pushPenalty(!!input.hasFreeConsultant, 'Free Consultant', 1);
+    pushPenalty(!!input.hasSilentHistory, 'Silent History', 1);
+    pushPenalty(!!input.hasBudgetMismatch, 'Budget Mismatch', 1);
 
     const effectiveHireRatePct =
       input.hireRatePct !== undefined
@@ -263,7 +293,7 @@
     const proposalsBase = input.proposalCount ?? 0;
     const invites = input.invitesSent ?? 0;
     const unanswered = input.unansweredInvites ?? 0;
-    const interviewingCount = input.interviewing ?? 0;
+    // interviewingCount ya está definido arriba
     const effectivePool = Math.max(
       0,
       proposalsBase + invites - unanswered
@@ -284,6 +314,22 @@
 
     if (isDeadPost) {
       addBadge(badges, 'Dead post');
+    }
+
+    // Shortlisting: lastViewed viejo pero hay entrevistas = cliente está en proceso de selección
+    const isShortlisting = daysSinceViewed !== null && daysSinceViewed > 2 && interviewingCount > 0;
+    if (isShortlisting) {
+      // Penalidad suave en lugar de KillSwitch
+      pushPenalty(true, 'Paused/Shortlisting', 0.5);
+      addBadge(badges, 'Shortlisting');
+    }
+
+    // Stagnant job: métricas no cambiaron en X días (requiere historial del cache)
+    const stagnantDays = input.stagnantDays ?? 0;
+    const isStagnantJob = stagnantDays >= 7 && interviewingCount === 0;
+    if (isStagnantJob) {
+      pushPenalty(true, 'Stagnant job (no changes in 7+ days)', 1);
+      addBadge(badges, 'Stagnant job');
     }
 
     const isPerpetualPosting =
@@ -345,7 +391,12 @@
       addBadge(badges, 'Window shopper');
     }
 
-    const isToxicClient = input.rating < 4.4;
+    const hasClientRating = Number.isFinite(input.rating) && input.rating > 0;
+    const hasLowReviewCount =
+      Number.isFinite(input.reviewsCount) &&
+      input.reviewsCount > 0 &&
+      input.reviewsCount <= LOW_REVIEW_TOXIC_THRESHOLD;
+    const isToxicClient = (hasClientRating && input.rating < 4.0) || hasLowReviewCount;
 
     if (input.hasLowRecentReview && !isToxicClient) {
       penaltiesApplied.push({ name: 'Ojo con los reviews', points: 1 });
@@ -381,7 +432,8 @@
     pushBonus(goldStandard, 'Gold standard bonus', 1, 'Gold standard');
 
     pushBonus(
-      effectiveHireRatePct >= 90,
+      effectiveHireRatePct >= 90 &&
+        (input.jobsPosted >= 5 || input.totalHires >= 3),
       'Elite hire rate bonus',
       1,
       'Elite hire rate'
@@ -396,10 +448,27 @@
       1,
       'Fresh off the oven'
     );
+    pushBonus(!!input.hasClearBrief, 'Clear Brief bonus', 1, 'Clear Brief');
+    pushBonus(
+      !!input.hasMilestoneFriendly,
+      'Milestone Friendly bonus',
+      1,
+      'Milestone Friendly'
+    );
+    pushBonus(
+      !!input.hasProfessionalTone,
+      'Professional Tone bonus',
+      1,
+      'Professional Tone'
+    );
 
     const teamBuilder =
       input.jobsPosted > 0 && input.totalHires / input.jobsPosted > 1.5;
     if (teamBuilder) addBadge(badges, 'Team builder');
+    if (input.isTooGoodToBeTrue) {
+      penaltiesApplied.push({ name: 'Too good to be true', points: 1.5 });
+      addBadge(badges, 'Too good to be true');
+    }
 
     const penalties = penaltiesApplied.reduce((acc, p) => acc + p.points, 0);
     const bonusPoints = bonusesApplied.reduce((acc, p) => acc + p.points, 0);
@@ -413,7 +482,9 @@
 
     if (isToxicClient) addBadge(badges, 'Toxic client');
 
-    if (lastViewedDate && hoursSince(lastViewedDate, now) > 48) {
+    // Ghost job badge: solo si no hay entrevistas activas (ya manejado arriba)
+    // Si hay entrevistas, ya se añadió 'Shortlisting' en su lugar
+    if (lastViewedDate && hoursSince(lastViewedDate, now) > 48 && interviewingCount === 0) {
       addBadge(badges, 'Ghost job');
     }
 
@@ -436,6 +507,22 @@
     if (input.jobsPosted === 0 && !killSwitches.includes('Newbie risk')) {
       addBadge(badges, 'New client');
     }
+    if (input.hasOffPlatformContact) {
+      addBadge(badges, 'Off-platform request');
+    }
+    if (input.hasExternalPaymentRequest) {
+      addBadge(badges, 'External payment risk');
+    }
+    if (input.hasFreeWorkRequest) {
+      addBadge(badges, 'Free work request');
+    }
+    if (Array.isArray(input.possibleClientNames) && input.possibleClientNames.length > 0) {
+      addBadge(badges, 'Possible client names');
+    }
+    if (input.hasScopeMonster) addBadge(badges, 'Scope Monster');
+    if (input.hasFreeConsultant) addBadge(badges, 'Free Consultant');
+    if (input.hasSilentHistory) addBadge(badges, 'Silent History');
+    if (input.hasBudgetMismatch) addBadge(badges, 'Budget Mismatch');
 
     return {
       killSwitches,
@@ -471,4 +558,3 @@
     root.evaluateSniper = evaluateSniper;
   }
 })();
-

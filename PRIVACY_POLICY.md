@@ -7,10 +7,12 @@ This Chrome/Edge extension (“the Extension”) scores and tags Upwork job post
 ## What data is processed
 - Upwork page content you are viewing: read only to compute the score and display badges.
 - Local cache of results: stored in `localStorage` with the job ID and the computed result to avoid recomputing. No personal data is stored.
+- Local UI preference: selected language (`en`/`es`) stored in `localStorage`.
 
 ## What data is NOT collected or sent
 - No personal information, usage analytics, cookies, or browser identifiers are collected or transmitted to external servers.
 - No data is shared with third parties.
+- Feedback uses a `mailto:` link to `anderrosariotav@gmail.com`; the extension does not transmit feedback content.
 
 ## Browser permissions
 - `activeTab` and `host_permissions` for `https://www.upwork.com/*`: required to read the Upwork page DOM and render the overlay. We do not access other sites.

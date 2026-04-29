@@ -22,6 +22,10 @@ Extensión MV3 para Chrome/Edge que puntúa y etiqueta ofertas de Upwork en tiem
 - Badges usan emojis para carga instantánea.  
 - El script observa mutaciones para captar tarjetas que aparecen dinámicamente.  
 - En páginas de detalle intenta parsear datos del sidebar; si algo falta usa fallbacks conservadores.
+- Idioma global: English por defecto, con selector EN/ES desde el botón de ajustes (`⚙`) junto al score.
+- Feedback no invasivo: enlace directo a `anderrosariotav@gmail.com` desde el panel de ajustes.
+- Nuevas señales de riesgo: contacto fuera de Upwork, pago externo sospechoso y trabajo gratis.
+- Señales de calidad adicionales: `Scope Monster`, `Free Consultant`, `Budget Mismatch`, `Clear Brief`, `Milestone Friendly`, `Professional Tone`.
 
 ## Próximos pasos sugeridos
 

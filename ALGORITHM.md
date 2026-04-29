@@ -1,6 +1,12 @@
-# 🎯 Anderson's Sniper Elite v4.7 — Hardcore Specs
+# 🎯 Anderson's Sniper Elite v4.8 — Hardcore Specs
 
-Documentación oficial del algoritmo de scoring para filtrar trabajos de Upwork. Incluye insumos requeridos, kill switches, puntajes base (con lógica de densidad), penalizaciones tácticas (ahora todas restan **-1**) y bonuses (todas suman **+1**) más badges clasificados.
+Documentación oficial del algoritmo de scoring para filtrar trabajos de Upwork. Incluye insumos requeridos, kill switches, puntajes base (con lógica de densidad), penalizaciones tácticas (ahora todas restan **-1** o **-0.5**) y bonuses (todas suman **+1**) más badges clasificados.
+
+**v4.8 Changelog:**
+- **Ghost job contextual:** Ahora solo es KillSwitch si `lastViewed > 2 días` Y `interviewing === 0`. Si hay entrevistas activas, es "Shortlisting" (penalidad suave).
+- **Nuevo badge Shortlisting:** Cliente pausó la búsqueda pero tiene candidatos en proceso.
+- **Nuevo badge Stagnant job:** Detecta estancamiento real comparando métricas históricas (7+ días sin cambios).
+- **Tracking histórico:** Cache almacena métricas por visita para detectar tendencias.
 
 ## 1. Entradas requeridas (JobInput)
 
@@ -20,7 +26,7 @@ Los siguientes datos deben extraerse del contexto del trabajo (Sidebar/Job Detai
 Si alguna condición es `TRUE`, el `FinalScore` se fuerza a **0 (F)** inmediatamente.
 
 1.  **Newbie Risk:** `memberSince < 5 months` **AND** (`paymentVerified == false` OR `jobsPosted == 0`).
-2.  **Ghost Job:** `lastViewed > 48 hours` (2 días). *Endurecido de 7 a 2 días.*
+2.  **Ghost Job:** `lastViewed > 48 hours` (2 días) **Y** `interviewing === 0`. *Nota: Si hay entrevistas activas (interviewing > 0), el cliente probablemente está en shortlisting, no abandonó el post.*
 3.  **Unverified & Broke:** `paymentVerified == false` **AND** `totalSpent == 0`.
 
 ***
@@ -54,10 +60,10 @@ Cálculo de componentes normalizados (0-100) ponderados.
 
 ### C. Rating (15%) - "Densidad de Reviews"
 
-*   Si `rating < 4.4` → **0 pts** (Toxic).
+*   Si `rating < 4.0` → **0 pts** (Toxic).
 *   Si `reviewsCount < 3` → **80 pts** (Capped por falta de data, aunque sea 5.0).
 *   Si `rating ≥ 4.8` (y reviews ≥ 3) → **100 pts**.
-*   Si `rating 4.4 – 4.7` (y reviews ≥ 3) → **70 pts**.
+*   Si `rating 4.0 – 4.7` (y reviews ≥ 3) → **70 pts**.
 
 ### D. Activity (10%) - "Intensidad" (interacción + frescura)
 
@@ -108,6 +114,8 @@ Todas restan **-1** al `BaseScore`:
 12. **Perpetual Posting:** `postedAt > 7 days`.
 13. **Time Waster:** `interviewing / proposals > 40%` **AND** `35% <= hireRate < 50%`.
 14. **Data Harvesting:** `hires <= 1` **AND** `interviewing / proposals > 35%` **AND** `hireRate < 25%` **AND** `memberSince < 6 months`.
+15. **Paused/Shortlisting:** (-0.5) `lastViewed > 2 días` **AND** `interviewing > 0`. *Cliente está en proceso de selección pero pausó la búsqueda.*
+16. **Stagnant job:** (-1) Métricas (proposals, interviewing, invites) sin cambios durante 7+ días **AND** `interviewing === 0`. *Requiere historial de visitas.*
 
 ***
 
@@ -171,8 +179,23 @@ Todos los bonuses suman **+1** (clamp a 100):
 * 🎣 **Spammer**: -1 (Invites Sent > 15; se reemplaza por **SOS** si hay urgencia declarada)
 * 👁️ **Ojo**: -1 (Historial reciente con reviews ≤ 3; con los reviews, puede haber algo ahí)
 * 🛑 **Crowded room**: -1 (Interviewing > 7)
-* 👻 **Ghost job**: Kill-switch (Last Viewed > 48h)
-* ☢️ **Toxic client**: 0 pts (badge/alerta)
+* 👻 **Ghost job**: Kill-switch (Last Viewed > 48h **Y** interviewing === 0)
+* 📋 **Shortlisting**: -0.5 (Last Viewed > 48h pero interviewing > 0; cliente en proceso de selección)
+* 🌊 **Stagnant job**: -1 (Métricas sin cambios en 7+ días, interviewing === 0)
+* ☢️ **Toxic client**: 0 pts (badge/alerta; aplica si `rating < 4.0` o si `reviewsCount` está en rango muy bajo `1-2`)
+* 🚫 **Off-platform request**: -2 (solicita mover contacto fuera de Upwork)
+* ⚠️ **External payment risk**: -2 (badge de riesgo; no mata el score)
+* 🧪 **Free work request**: -2 (prueba gratis o trabajo no pagado)
+* 🎣 **Too good to be true**: -1.5 (tarea simple + pago alto + historial débil)
+* 🧾 **Possible client names**: 0 pts (informativo; solo se extrae desde **Client's recent history**, excluyendo bloques `To freelancer:` para evitar nombres de freelancers)
+* 🧩 **Scope Monster**: -1 (demasiados roles en una vacante; riesgo de alcance difuso y retrabajo)
+* 🪪 **Job no longer available**: Kill-switch (si aparece `Job is no longer available`, score = 0)
+* 🧠 **Free Consultant**: -1 (solicita estrategia/diagnóstico detallado antes de contratar; riesgo de trabajo no pagado)
+* 🕳️ **Silent History**: -1 (actividad histórica con poca evidencia de feedback visible)
+* ⚖️ **Budget Mismatch**: -1 (nivel experto con presupuesto bajo para el alcance esperado)
+* 🎯 **Clear Brief**: +1 (entregables + deadline claros; mejor ejecutabilidad)
+* 🧱 **Milestone Friendly**: +1 (menciona hitos/fases/pagos por etapa; mejor control de riesgo)
+* 🧑‍💼 **Professional Tone**: +1 (lenguaje técnico/profesional, normalmente más colaborable)
 
 **Prioridad (mutuamente excluyentes entre sí):** Sociable > Data Harvesting > Time Waster.
 

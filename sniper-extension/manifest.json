@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
-  "name": "Anderson's Sniper - Upwork Job Evaluator",
-  "version": "1.0.0",
+  "name": "Upwork Job Quality Grader",
+  "version": "1.0.3",
   "description": "Evalúa trabajos de Upwork en tiempo real con scoring inteligente.",
   "host_permissions": [
     "https://www.upwork.com/*"
@@ -13,6 +13,7 @@
       ],
       "js": [
         "sniper-core.js",
+        "extractors.js",
         "content-script.js"
       ],
       "css": [
