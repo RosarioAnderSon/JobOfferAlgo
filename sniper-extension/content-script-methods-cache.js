@@ -4,7 +4,21 @@
   const UpworkSniperExtension = window.UpworkSniperExtension;
   if (!UpworkSniperExtension) return;
   const logs = window.SniperLog || {};
+  const logSuccess = logs.logSuccess || (() => {});
   const logError = logs.logError || (() => {});
+
+  UpworkSniperExtension.prototype.getBadgeSchemaVersion = function() {
+    const parsed = Number(this.badgeSchemaVersion);
+    return Number.isFinite(parsed) && parsed > 0 ? Math.floor(parsed) : 1;
+  };
+
+  UpworkSniperExtension.prototype.isCacheEntryBadgeSchemaStale = function(entry) {
+    if (!entry || typeof entry !== 'object') return true;
+    const current = this.getBadgeSchemaVersion();
+    const entryVersion = Number(entry.badgeSchemaVersion);
+    if (!Number.isFinite(entryVersion)) return true;
+    return Math.floor(entryVersion) < current;
+  };
 
   UpworkSniperExtension.prototype.pruneCache = function(cache) {
     const now = Date.now();
@@ -65,6 +79,7 @@
           // Reducir tamaño: conservar solo metrica historica y quitar payload grande.
           rawData: null,
           ts: entry.ts || Date.now(),
+          badgeSchemaVersion: Number(entry.badgeSchemaVersion) || this.getBadgeSchemaVersion(),
           metricsHistory: Array.isArray(entry.metricsHistory) ? entry.metricsHistory.slice(-8) : [],
         };
       });
@@ -145,8 +160,13 @@
       result,
       rawData,
       ts: now,
+      badgeSchemaVersion: this.getBadgeSchemaVersion(),
       metricsHistory,
     };
+    if (typeof this.diagBadge === 'function' && this.isBadgeDiagEnabled()) {
+      const badgeList = Array.isArray(result.badges) ? result.badges : [];
+      this.diagBadge(`cache-write jobId=${jobId} badgeCount=${badgeList.length} stale=false`, badgeList);
+    }
 
     this.pruneCache(cache);
     this.saveCache(cache);
@@ -187,39 +207,103 @@
   };
 
   UpworkSniperExtension.prototype.applyCachedOverlaysToFeed = function() {
-    this.removeOrphanOverlays();
-
-    const cache = this.loadCache();
-    if (Object.keys(cache).length === 0) {
-      this.renderGlobalMissingSkillsSidebar();
-      return;
+    if (this.overlayFeedPassInProgress) {
+      return { mutated: false, skipped: 'locked' };
     }
+    this.overlayFeedPassInProgress = true;
 
-    const isInsideModal = (el) => el && el.closest('[role="dialog"], .air3-slider-job-details, .job-details-content');
+    let mutated = false;
+    let mutatedCount = 0;
+    let truncated = false;
 
-    const cards = Array.from(
-      document.querySelectorAll('section.air3-card-section, article.job-tile, [data-test="job-tile"]')
-    ).filter((card) => !isInsideModal(card));
+    try {
+      if (typeof this.hasOverlayRuntimeReady === 'function' && !this.hasOverlayRuntimeReady()) {
+        return { mutated: false, skipped: 'missing-methods' };
+      }
 
-    cards.forEach((card) => {
-      const jobId = this.getCardJobId(card);
-      if (!jobId) return;
+      this.overlayFeedTickCount = (this.overlayFeedTickCount || 0) + 1;
+      const cleanupEvery = Number(this.overlayOrphanCleanupEveryTicks) > 0 ? Number(this.overlayOrphanCleanupEveryTicks) : 6;
+      const shouldCleanupOrphans =
+        this.overlayOrphanCleanupNeeded || this.overlayFeedTickCount % cleanupEvery === 0;
+      if (shouldCleanupOrphans) {
+        this.removeOrphanOverlays();
+        this.overlayOrphanCleanupNeeded = false;
+      }
 
-      const cachedEntry = cache[jobId];
-      const cached = cachedEntry?.result;
-      if (!cached) return;
+      const cache = this.loadCache();
+      if (Object.keys(cache).length === 0) {
+        const hasSniperUi = !!document.querySelector('.sniper-overlay, .sniper-left-panel, .sniper-global-missing-skills');
+        if (!hasSniperUi) {
+          return { mutated: false, cards: 0, skipped: 'empty-cache-no-ui' };
+        }
+        this.renderGlobalMissingSkillsSidebar();
+        return { mutated: false, cards: 0 };
+      }
 
-      this.cleanupOverlays(card, jobId);
+      const cards =
+        typeof this.getFeedJobCards === 'function'
+          ? this.getFeedJobCards(document)
+          : Array.from(document.querySelectorAll('section.air3-card-section, article.job-tile, [data-test="job-tile"]'));
 
-      const existingOverlay = card.querySelector(`.sniper-overlay[data-job-id="${jobId}"]`);
-      if (existingOverlay) return;
+      const budgetRaw = Number(this.overlayMutationBudgetPerTick);
+      const mutationBudget = Number.isFinite(budgetRaw) && budgetRaw > 0 ? Math.floor(budgetRaw) : 4;
 
-      const legacyOverlay = card.querySelector('.sniper-overlay:not([data-job-id])');
-      if (legacyOverlay) return;
+      cards.forEach((card) => {
+        if (mutatedCount >= mutationBudget) {
+          truncated = true;
+          return;
+        }
 
-      this.injectOverlay(card, cached, cachedEntry?.rawData || null, jobId);
-    });
+        // Usar data-sniper-job-id como fuente de verdad si ya fue asignado
+        let jobId = card.getAttribute('data-sniper-job-id');
+        if (!jobId) {
+          jobId = this.getCardJobId(card);
+          if (!jobId) return;
+        }
 
-    this.renderGlobalMissingSkillsSidebar();
+        const cachedEntry = cache[jobId];
+        const stale = this.isCacheEntryBadgeSchemaStale(cachedEntry);
+        const cached = cachedEntry?.result;
+        if (!cached) return;
+        if (stale) {
+          const staleOverlay = card.querySelector(`.sniper-overlay[data-job-id="${jobId}"]`);
+          if (staleOverlay) staleOverlay.remove();
+          const stalePanel = card.querySelector(`.sniper-left-panel[data-job-id="${jobId}"]`);
+          if (stalePanel) stalePanel.remove();
+          if (typeof this.diagBadge === 'function' && this.isBadgeDiagEnabled()) {
+            const staleBadges = Array.isArray(cached.badges) ? cached.badges : [];
+            this.diagBadge(`cache-read jobId=${jobId} stale=true badgeCount=${staleBadges.length}`, staleBadges);
+          }
+          return;
+        }
+
+        this.cleanupOverlays(card, jobId);
+
+        const existingOverlay = card.querySelector(`.sniper-overlay[data-job-id="${jobId}"]`);
+        if (existingOverlay) return;
+
+        const legacyOverlay = card.querySelector('.sniper-overlay:not([data-job-id])');
+        if (legacyOverlay) return;
+
+        this.injectOverlay(card, cached, cachedEntry?.rawData || null, jobId);
+        if (typeof this.diagBadge === 'function' && this.isBadgeDiagEnabled()) {
+          const renderedBadges = Array.isArray(cached.badges) ? cached.badges : [];
+          this.diagBadge(`cache-read jobId=${jobId} stale=false badgeCount=${renderedBadges.length}`, renderedBadges);
+        }
+        mutated = true;
+        mutatedCount += 1;
+      });
+
+      this.renderGlobalMissingSkillsSidebar();
+      if (mutatedCount > 0) {
+        logSuccess(`Overlay inyectado desde cache: ${mutatedCount}`);
+      }
+      return { mutated, cards: cards.length, mutatedCount, truncated };
+    } catch (error) {
+      logError('CACHE', 'Fallo en applyCachedOverlaysToFeed()', error);
+      return { mutated: false, error: true };
+    } finally {
+      this.overlayFeedPassInProgress = false;
+    }
   };
 })();

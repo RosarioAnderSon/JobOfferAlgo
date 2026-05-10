@@ -13,10 +13,16 @@
       const gradeClass = result.grade.replace('+', 'plus').replace('-', 'minus');
       scoreEl.className = `sniper-score grade-${gradeClass} has-tooltip`;
 
-      scoreEl.innerHTML = `
-        <span class="score-value">${result.finalScore}</span>
-        <span class="score-grade">${result.grade}</span>
-      `;
+      const valSpan = document.createElement('span');
+      valSpan.className = 'score-value';
+      valSpan.textContent = result.finalScore;
+      
+      const gradeSpan = document.createElement('span');
+      gradeSpan.className = 'score-grade';
+      gradeSpan.textContent = result.grade;
+      
+      scoreEl.appendChild(valSpan);
+      scoreEl.appendChild(gradeSpan);
 
       const tooltip = this.createScoreTooltip(result, rawData);
       scoreEl.appendChild(tooltip);
@@ -29,13 +35,26 @@
       tooltip.className = 'sniper-score-tooltip';
 
       if (result.killSwitches && result.killSwitches.length > 0) {
-        tooltip.innerHTML = `
-          <div class="tooltip-title">${this.t('killed')}</div>
-          <div class="tooltip-meta kill">${this.t('reasons')}</div>
-          <ul class="tooltip-kill-list">
-            ${result.killSwitches.map((k) => `<li>${k}</li>`).join('')}
-          </ul>
-        `;
+        const tTitle = document.createElement('div');
+        tTitle.className = 'tooltip-title';
+        tTitle.textContent = this.t('killed');
+
+        const tMeta = document.createElement('div');
+        tMeta.className = 'tooltip-meta kill';
+        tMeta.textContent = this.t('reasons');
+
+        const tList = document.createElement('ul');
+        tList.className = 'tooltip-kill-list';
+        result.killSwitches.forEach(k => {
+          const li = document.createElement('li');
+          li.textContent = k;
+          tList.appendChild(li);
+        });
+
+        tooltip.appendChild(tTitle);
+        tooltip.appendChild(tMeta);
+        tooltip.appendChild(tList);
+        
         return tooltip;
       }
 
@@ -43,24 +62,48 @@
 
       const metaLine = `${this.t('base')}: ${result.baseScore} | ${this.t('bonus')}: +${result.totals.bonuses} | ${this.t('penalty')}: ${result.totals.penalties}`;
 
-      tooltip.innerHTML = `
-        <div class="tooltip-title">${this.t('scoreDetail')}</div>
-        <div class="tooltip-meta">${metaLine}</div>
-        <div class="tooltip-grid">
-          ${breakdown
-          .map(
-            (item) => `
-                <div class="tooltip-item ${item.tone}">
-                  <span class="dot"></span>
-                  <span class="label">${item.label}</span>
-                  <span class="value">${item.grade}</span>
-                </div>
-                ${item.reason ? `<div class="tooltip-reason">${item.reason}</div>` : ''}
-              `
-          )
-          .join('')}
-        </div>
-      `;
+        const tTitle = document.createElement('div');
+        tTitle.className = 'tooltip-title';
+        tTitle.textContent = this.t('scoreDetail');
+
+        const tMeta = document.createElement('div');
+        tMeta.className = 'tooltip-meta';
+        tMeta.textContent = metaLine;
+
+        const tGrid = document.createElement('div');
+        tGrid.className = 'tooltip-grid';
+
+        breakdown.forEach(item => {
+          const tItem = document.createElement('div');
+          tItem.className = `tooltip-item ${item.tone}`;
+
+          const dot = document.createElement('span');
+          dot.className = 'dot';
+          
+          const label = document.createElement('span');
+          label.className = 'label';
+          label.textContent = item.label;
+          
+          const val = document.createElement('span');
+          val.className = 'value';
+          val.textContent = item.grade;
+
+          tItem.appendChild(dot);
+          tItem.appendChild(label);
+          tItem.appendChild(val);
+          tGrid.appendChild(tItem);
+
+          if (item.reason) {
+            const reasonEl = document.createElement('div');
+            reasonEl.className = 'tooltip-reason';
+            reasonEl.textContent = item.reason;
+            tGrid.appendChild(reasonEl);
+          }
+        });
+
+        tooltip.appendChild(tTitle);
+        tooltip.appendChild(tMeta);
+        tooltip.appendChild(tGrid);
 
       return tooltip;
     }
@@ -159,14 +202,28 @@
     }
   UpworkSniperExtension.prototype.createBadge = function(badgeName, rawData = null) {
       const config = this.getBadgeConfig(badgeName, rawData);
+      const meta = config?._badgeMeta || {
+        sourceBadge: String(badgeName || ''),
+        resolvedBadge: String(badgeName || ''),
+        mappedByAlias: false,
+        unknown: false,
+      };
       const badgeEl = document.createElement('span');
       badgeEl.className = `sniper-badge ${config.type}`;
+      badgeEl.setAttribute('data-badge-source', meta.sourceBadge || '');
+      badgeEl.setAttribute('data-badge-resolved', meta.resolvedBadge || '');
+      if (meta.mappedByAlias) badgeEl.setAttribute('data-badge-alias', '1');
+      if (meta.unknown) badgeEl.setAttribute('data-badge-unknown', '1');
       if (badgeName === 'Niche Avg/hr') {
         badgeEl.classList.add('sniper-badge-avg');
       }
 
       if (config.iconSvg) {
-        badgeEl.innerHTML = config.iconSvg;
+        const parser = new DOMParser();
+        const svgDoc = parser.parseFromString(config.iconSvg, 'image/svg+xml');
+        if (svgDoc.documentElement.nodeName !== 'parsererror') {
+          badgeEl.appendChild(svgDoc.documentElement);
+        }
       } else {
         badgeEl.textContent = config.icon || '';
       }
@@ -176,7 +233,7 @@
       tooltipEl.className = 'sniper-tooltip';
       const titleEl = document.createElement('div');
       titleEl.className = 'sniper-tooltip-title';
-      titleEl.textContent = config.tooltipTitle || badgeName;
+      titleEl.textContent = config.tooltipTitle || meta.resolvedBadge || badgeName;
       const descEl = document.createElement('div');
       descEl.className = 'sniper-tooltip-desc';
       descEl.textContent = config.description;

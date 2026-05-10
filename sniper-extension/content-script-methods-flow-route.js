@@ -1,10 +1,11 @@
-﻿(() => {
+(() => {
   'use strict';
 
   const UpworkSniperExtension = window.UpworkSniperExtension;
   if (!UpworkSniperExtension) return;
   const logs = window.SniperLog || {};
   const log = logs.log || (() => {});
+  const logVerbose = logs.logVerbose || (() => {});
   const logSuccess = logs.logSuccess || (() => {});
   const logError = logs.logError || (() => {});
 
@@ -26,7 +27,7 @@
           clearInterval(checkInterval);
           logError('DETAIL', `Timeout esperando modal del job ${jobId} (${attempts * 500}ms)`);
         } else {
-          log('DETAIL', `Intento ${attempts}/${maxAttempts}: Modal del job aun no existe`);
+          logVerbose('DETAIL', `Intento ${attempts}/${maxAttempts}: Modal del job aun no existe`);
         }
         return;
       }
@@ -52,7 +53,7 @@
       const hasClientSection =
         modalTextLower.includes('about the client') || modalTextLower.includes('member since');
 
-      log(
+      logVerbose(
         'DETAIL',
         `Intento ${attempts}/${maxAttempts}: modal=${!!jobModal}, clientInfo=${!!clientInfo}, desc=${!!jobDescription}, realContent=${hasRealContent}, hasClientSection=${hasClientSection}`
       );
@@ -71,7 +72,7 @@
         );
 
         if (jobModal && clientInfo && jobDescription) {
-          log('DETAIL', 'Intentando procesar con contenido parcial...');
+          logVerbose('DETAIL', 'Intentando procesar con contenido parcial...');
           this.processJobDetail(jobId);
         }
       }
@@ -82,7 +83,7 @@
     log('DETAIL', `Procesando job ${jobId}`);
     try {
       const extractedData = this.extractJobData();
-      log('DETAIL', `Datos extraidos (job ${jobId})`, extractedData);
+      logVerbose('DETAIL', `Datos extraidos (job ${jobId})`, extractedData);
       this.evaluateAndRender(jobId, extractedData);
     } catch (error) {
       logError('DETAIL', `Error procesando job ${jobId}`, error);
@@ -113,12 +114,12 @@
     const effectiveSidebar = sidebar || aboutClientSection || scope;
     const sidebarText = effectiveSidebar?.innerText || effectiveSidebar?.textContent || '';
 
-    log('DETAIL', '--- EXTRACCION DE DATOS ---');
-    log('DETAIL', `Scope selector: ${scope === document.body ? 'body' : scope.className || scope.tagName}`);
-    log('DETAIL', `Sidebar found: ${!!sidebar} (${sidebar?.className || sidebar?.tagName || 'N/A'})`);
-    log('DETAIL', `About client section: ${!!aboutClientSection}`);
-    log('DETAIL', `Effective sidebar text length: ${sidebarText.length} chars`);
-    log('DETAIL', `Effective sidebar first 400 chars: "${sidebarText.substring(0, 400).replace(/\s+/g, ' ')}"`);
+    logVerbose('DETAIL', '--- EXTRACCION DE DATOS ---');
+    logVerbose('DETAIL', `Scope selector: ${scope === document.body ? 'body' : scope.className || scope.tagName}`);
+    logVerbose('DETAIL', `Sidebar found: ${!!sidebar} (${sidebar?.className || sidebar?.tagName || 'N/A'})`);
+    logVerbose('DETAIL', `About client section: ${!!aboutClientSection}`);
+    logVerbose('DETAIL', `Effective sidebar text length: ${sidebarText.length} chars`);
+    logVerbose('DETAIL', `Effective sidebar first 400 chars: "${sidebarText.substring(0, 400).replace(/\s+/g, ' ')}"`);
 
     const activityHeader = Array.from(scope.querySelectorAll('h5, h4')).find((el) =>
       el?.textContent?.includes('Activity on this job')
@@ -127,8 +128,8 @@
       activityHeader?.parentElement || activityHeader?.closest('section') || effectiveSidebar?.parentElement || scope;
     const activityText = activitySection?.innerText || activitySection?.textContent || '';
 
-    log('DETAIL', `Activity section found: ${!!activityHeader}`);
-    log('DETAIL', `Activity text length: ${activityText.length} chars`);
+    logVerbose('DETAIL', `Activity section found: ${!!activityHeader}`);
+    logVerbose('DETAIL', `Activity text length: ${activityText.length} chars`);
 
     const descEl = scope.querySelector('[data-test="Description"], .job-description, .description');
     const descText = descEl?.innerText || descEl?.textContent || '';
@@ -142,9 +143,9 @@
     }
     const clientRatingText = extractors.getClientRatingText(scope, effectiveSidebar);
 
-    log('DETAIL', `Description length: ${descText.length} chars`);
-    log('DETAIL', `Total scope text length: ${scopeText.length} chars`);
-    log('DETAIL', '------------------------------------');
+    logVerbose('DETAIL', `Description length: ${descText.length} chars`);
+    logVerbose('DETAIL', `Total scope text length: ${scopeText.length} chars`);
+    logVerbose('DETAIL', '------------------------------------');
 
     const extractedData = {
       jobId: this.currentJobId || null,
@@ -205,15 +206,15 @@
     extractedData.supportAvgBadge = this.computeSupportAvgBadge(extractedData);
     extractedData.skillsMatch = this.computeSkillsMatch(requiredSkills, extractedData.jobId);
 
-    log('DETAIL', 'Valores extraidos:');
-    log('DETAIL', `  - jobsPosted: ${extractedData.jobsPosted}`);
-    log('DETAIL', `  - totalHires: ${extractedData.totalHires}`);
-    log('DETAIL', `  - totalSpent: $${extractedData.totalSpent}`);
-    log('DETAIL', `  - hireRatePct: ${extractedData.hireRatePct}%`);
-    log('DETAIL', `  - paymentVerified: ${extractedData.paymentVerified}`);
-    log('DETAIL', `  - rating: ${extractedData.rating}`);
-    log('DETAIL', `  - memberSince: ${extractedData.memberSince?.toDateString?.() || 'N/A'}`);
-    log('DETAIL', `  - requiredSkills: ${requiredSkills.length}`);
+    logVerbose('DETAIL', 'Valores extraidos:');
+    logVerbose('DETAIL', `  - jobsPosted: ${extractedData.jobsPosted}`);
+    logVerbose('DETAIL', `  - totalHires: ${extractedData.totalHires}`);
+    logVerbose('DETAIL', `  - totalSpent: $${extractedData.totalSpent}`);
+    logVerbose('DETAIL', `  - hireRatePct: ${extractedData.hireRatePct}%`);
+    logVerbose('DETAIL', `  - paymentVerified: ${extractedData.paymentVerified}`);
+    logVerbose('DETAIL', `  - rating: ${extractedData.rating}`);
+    logVerbose('DETAIL', `  - memberSince: ${extractedData.memberSince?.toDateString?.() || 'N/A'}`);
+    logVerbose('DETAIL', `  - requiredSkills: ${requiredSkills.length}`);
 
     return extractedData;
   };
@@ -232,20 +233,39 @@
 
     const enrichedData = { ...data, stagnantDays };
 
-    const result = evaluateSniper(enrichedData);
-    log('FASE 2', `Resultado job ${jobId}`, result);
+    const weights = typeof this.getScoreWeights === 'function' ? this.getScoreWeights() : null;
+    const result = evaluateSniper(enrichedData, weights);
+    logVerbose('FASE 2', `Resultado job ${jobId}`, result);
 
     this.setCachedResult(jobId, result, data);
     this.updateMissingSkillsFinalScore(jobId, result.finalScore);
 
-    this.renderUI(result, data);
-    logSuccess(`Renderizado completado para job ${jobId}`);
+    const rendered = this.renderUI(result, data);
+    if (rendered) {
+      logSuccess(`Renderizado completado para job ${jobId}`);
+    } else {
+      log('FASE 2', `Render omitido para job ${jobId}`);
+    }
   };
 
   UpworkSniperExtension.prototype.renderUI = function(result, rawData) {
+    if (typeof this.hasOverlayRuntimeReady === 'function' && !this.hasOverlayRuntimeReady()) {
+      logError('FASE 2', 'Overlay runtime no esta listo para renderUI()');
+      return false;
+    }
+
     const jobCard = this.findJobCardById(this.currentJobId);
 
     if (jobCard) {
+      const now = Date.now();
+      if (!this.overlayRenderDebounceByJob) this.overlayRenderDebounceByJob = {};
+      const lastRenderAt = Number(this.overlayRenderDebounceByJob[this.currentJobId] || 0);
+      const existingOverlayNow = jobCard.querySelector(`.sniper-overlay[data-job-id="${this.currentJobId}"]`);
+      if (existingOverlayNow && now - lastRenderAt < 3000) {
+        logVerbose('FASE 2', `Render evitado por debounce (${this.currentJobId})`);
+        return true;
+      }
+
       this.removeOrphanOverlays();
       this.cleanupOverlays(jobCard, this.currentJobId);
 
@@ -256,20 +276,32 @@
       if (legacyOverlay) legacyOverlay.remove();
 
       this.injectOverlay(jobCard, result, rawData, this.currentJobId);
+      this.overlayRenderDebounceByJob[this.currentJobId] = now;
+      const debounceKeys = Object.keys(this.overlayRenderDebounceByJob);
+      if (debounceKeys.length > 120) {
+        debounceKeys
+          .sort((a, b) => this.overlayRenderDebounceByJob[b] - this.overlayRenderDebounceByJob[a])
+          .slice(80)
+          .forEach((jobId) => delete this.overlayRenderDebounceByJob[jobId]);
+      }
       logSuccess(`Overlay inyectado en la job card para ${this.currentJobId}`);
+      return true;
     } else {
       logError('FASE 2', `No se encontro la job card para inyectar overlay (job ${this.currentJobId})`);
+      return false;
     }
   };
 
   UpworkSniperExtension.prototype.findJobCardById = function(jobId) {
     if (!jobId) return null;
+    if (typeof this.getCardJobId !== 'function' || typeof this.getFeedJobLinks !== 'function') {
+      return null;
+    }
 
-    const isInsideModal = (el) => el && el.closest('[role="dialog"], .air3-slider-job-details, .job-details-content');
-
-    const candidateCards = Array.from(
-      document.querySelectorAll('section.air3-card-section, article.job-tile, [data-test="job-tile"]')
-    ).filter((card) => !isInsideModal(card));
+    const candidateCards =
+      typeof this.getFeedJobCards === 'function'
+        ? this.getFeedJobCards(document)
+        : Array.from(document.querySelectorAll('section.air3-card-section, article.job-tile, [data-test="job-tile"]'));
 
     const byResolvedId = candidateCards.find((card) => this.getCardJobId(card) === jobId);
     if (byResolvedId) return byResolvedId;

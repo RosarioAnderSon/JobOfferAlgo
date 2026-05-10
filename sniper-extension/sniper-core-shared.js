@@ -26,7 +26,7 @@
     return (now.getTime() - date.getTime()) / MS_PER_HOUR;
   };
 
-  const hireRatePoints = (jobsPosted, totalHires, overridePct) => {
+  const hireRatePoints = (jobsPosted, totalHires, overridePct, thresholds = { A: 90, B: 70, C: 50 }) => {
     if (jobsPosted === 0) return 85;
     const baseRate =
       overridePct !== undefined ? overridePct : (totalHires / jobsPosted) * 100;
@@ -36,34 +36,34 @@
 
     const adjusted = baseRate * multiplier;
 
-    if (adjusted >= 90) return 100;
-    if (adjusted >= 70) return 85;
-    if (adjusted >= 50) return 50;
+    if (adjusted >= thresholds.A) return 100;
+    if (adjusted >= thresholds.B) return 85;
+    if (adjusted >= thresholds.C) return 50;
     return 0;
   };
 
-  const spendPoints = (totalSpent, totalHires, jobsPosted, jobBudget) => {
+  const spendPoints = (totalSpent, totalHires, jobsPosted, jobBudget, thresholds = { A: 1000, B: 500, C: 200 }) => {
     const avgPrice =
       totalHires > 0
         ? totalSpent / totalHires
         : totalSpent === 0 && jobsPosted < 3 && jobBudget
           ? jobBudget
           : 0;
-    if (avgPrice >= 1000) return 100;
-    if (avgPrice >= 500) return 90;
-    if (avgPrice >= 200) return 75;
+    if (avgPrice >= thresholds.A) return 100;
+    if (avgPrice >= thresholds.B) return 90;
+    if (avgPrice >= thresholds.C) return 75;
     if (avgPrice > 0) return 20;
     return 0;
   };
 
-  const ratingPoints = (rating, reviewsCount) => {
-    if (rating < 4.0) return 0;
+  const ratingPoints = (rating, reviewsCount, thresholds = { A: 4.8, min: 4.0 }) => {
+    if (rating < thresholds.min) return 0;
     if (reviewsCount < 3) return 80;
-    if (rating >= 4.8) return 100;
+    if (rating >= thresholds.A) return 100;
     return 70;
   };
 
-  const activityPoints = (input, now) => {
+  const activityPoints = (input, now, thresholds = { fresh: 12, recent: 24 }) => {
     const hasInteraction =
       (input.interviewing ?? 0) > 0 ||
       (input.lastViewed instanceof Date &&
@@ -75,34 +75,34 @@
         ? hoursSince(input.postedAt, now)
         : Infinity;
 
-    // Primeras 12h: con interacción A, sin interacción B
-    if (postedHours < 12) {
+    // Primeras horas: con interacción A, sin interacción B
+    if (postedHours < thresholds.fresh) {
       return hasInteraction ? 100 : 85;
     }
 
-    // Primeras 24h: con o sin interacción = B (si no hay señal, no castigamos a F aún)
-    if (postedHours < 24) {
+    // Hasta el limite reciente: con o sin interacción = B (si no hay señal, no castigamos a F aún)
+    if (postedHours < thresholds.recent) {
       return hasInteraction ? 85 : 85;
     }
 
-    // 24h+: con interacción = B; sin interacción = F
+    // Más allá del límite reciente: con interacción = B; sin interacción = F
     if (hasInteraction) return 85;
     return 0;
   };
 
-  const proposalsPoints = (proposalCount) => {
-    if (proposalCount < 5) return 100; // A
-    if (proposalCount <= 10) return 85; // B
-    if (proposalCount <= 15) return 70; // C
+  const proposalsPoints = (proposalCount, thresholds = { A: 5, B: 10, C: 15 }) => {
+    if (proposalCount < thresholds.A) return 100; // A
+    if (proposalCount <= thresholds.B) return 85; // B
+    if (proposalCount <= thresholds.C) return 70; // C
     if (proposalCount <= 50) return 0; // F
     return 0;
   };
 
   const paymentPoints = (paymentVerified) => (paymentVerified ? 100 : 0);
 
-  const jobsPostedPoints = (jobsPosted) => {
-    if (jobsPosted >= 10) return 100;
-    if (jobsPosted >= 1) return 80;
+  const jobsPostedPoints = (jobsPosted, thresholds = { A: 10, B: 1 }) => {
+    if (jobsPosted >= thresholds.A) return 100;
+    if (jobsPosted >= thresholds.B) return 80;
     return 50;
   };
 

@@ -65,13 +65,15 @@
   };
 
   UpworkSniperExtension.prototype.getSelectedNiche = function() {
-    const raw = localStorage.getItem(this.selectedNicheKey);
+    const key = this.selectedNicheKey || this.nicheKey || 'sniper-selected-niche-v1';
+    const raw = localStorage.getItem(key);
     return SUPPORTED_NICHES.includes(raw) ? raw : 'customer_service';
   };
 
   UpworkSniperExtension.prototype.setSelectedNiche = function(value) {
     const normalized = SUPPORTED_NICHES.includes(value) ? value : 'customer_service';
-    localStorage.setItem(this.selectedNicheKey, normalized);
+    const key = this.selectedNicheKey || this.nicheKey || 'sniper-selected-niche-v1';
+    localStorage.setItem(key, normalized);
   };
 
   UpworkSniperExtension.prototype.extractClientHistoryRates = function(scopeText) {

@@ -21,7 +21,7 @@
     LOW_REVIEW_TOXIC_THRESHOLD,
   } = shared;
 
-  const evaluateSniper = (input) => {
+  const evaluateSniper = (input, customWeights = null) => {
     const now = input.now ?? new Date();
     const addBadge = (list, badge) => {
       if (!list.includes(badge)) list.push(badge);
@@ -101,24 +101,44 @@
       };
     }
 
+    const defaultWeights = {
+      hireRate: { weight: 30, thresholds: { A: 90, B: 70, C: 50 } },
+      spend: { weight: 25, thresholds: { A: 1000, B: 500, C: 200 } },
+      rating: { weight: 15, thresholds: { A: 4.8, min: 4.0 } },
+      activity: { weight: 10, thresholds: { fresh: 12, recent: 24 } },
+      proposals: { weight: 10, thresholds: { A: 5, B: 10, C: 15 } },
+      payment: { weight: 5, thresholds: {} },
+      jobs: { weight: 5, thresholds: { A: 10, B: 1 } },
+    };
+    
+    // Si customWeights viene de v1, se usa defaultWeights como base o se asume migrado. 
+    // Como getScoreWeights ya migra, asumimos formato correcto.
+    const weights = customWeights || defaultWeights;
+
     const componentScores = {
-      hireRate: hireRatePoints(input.jobsPosted, input.totalHires, input.hireRatePct),
-      spend: spendPoints(input.totalSpent, input.totalHires, input.jobsPosted, input.jobBudget),
-      rating: ratingPoints(input.rating, input.reviewsCount),
-      activity: activityPoints(input, now),
-      proposals: proposalsPoints(input.proposalCount),
+      hireRate: hireRatePoints(input.jobsPosted, input.totalHires, input.hireRatePct, weights.hireRate?.thresholds),
+      spend: spendPoints(input.totalSpent, input.totalHires, input.jobsPosted, input.jobBudget, weights.spend?.thresholds),
+      rating: ratingPoints(input.rating, input.reviewsCount, weights.rating?.thresholds),
+      activity: activityPoints(input, now, weights.activity?.thresholds),
+      proposals: proposalsPoints(input.proposalCount, weights.proposals?.thresholds),
       payment: paymentPoints(input.paymentVerified),
-      jobs: jobsPostedPoints(input.jobsPosted),
+      jobs: jobsPostedPoints(input.jobsPosted, weights.jobs?.thresholds),
     };
 
-    const baseScore =
-      componentScores.hireRate * 0.3 +
-      componentScores.spend * 0.25 +
-      componentScores.rating * 0.15 +
-      componentScores.activity * 0.1 +
-      componentScores.proposals * 0.1 +
-      componentScores.payment * 0.05 +
-      componentScores.jobs * 0.05;
+    const totalWeight = Object.values(weights).reduce((sum, w) => sum + Number(w.weight || 0), 0);
+
+    let rawBaseScore = 0;
+    if (totalWeight > 0) {
+      rawBaseScore =
+        componentScores.hireRate * (weights.hireRate.weight / totalWeight) +
+        componentScores.spend * (weights.spend.weight / totalWeight) +
+        componentScores.rating * (weights.rating.weight / totalWeight) +
+        componentScores.activity * (weights.activity.weight / totalWeight) +
+        componentScores.proposals * (weights.proposals.weight / totalWeight) +
+        componentScores.payment * (weights.payment.weight / totalWeight) +
+        componentScores.jobs * (weights.jobs.weight / totalWeight);
+    }
+    const baseScore = rawBaseScore;
 
     const penaltiesApplied = [];
     const bonusesApplied = [];

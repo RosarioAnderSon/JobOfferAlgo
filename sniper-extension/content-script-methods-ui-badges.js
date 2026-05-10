@@ -222,8 +222,43 @@
           type: 'good',
           tooltipTitle: this.language === 'es' ? 'Comunicaci\u00f3n Profesional' : 'Professional Tone',
           description: 'Describe necesidad de forma espec\u00edfica y profesional; suele mejorar colaboraci\u00f3n.',
-        },      };
-      if (badge === 'Possible client names') {
+        },
+        'Poco esfuerzo': {
+          icon: '🧩',
+          type: 'bad',
+          tooltipTitle: this.language === 'es' ? 'Baja calidad de brief' : 'Low-effort brief',
+          description: this.language === 'es'
+            ? 'Descripción plantilla o de bajo esfuerzo; aumenta ambigüedad y riesgo de retrabajo.'
+            : 'Template-like or low-effort brief; tends to increase ambiguity and rework risk.',
+        },
+      };
+
+      const normalizeBadgeKey = (value) =>
+        String(value || '')
+          .normalize('NFD')
+          .replace(/[\u0300-\u036f]/g, '')
+          .replace(/[^\w\s$+.-]/g, ' ')
+          .replace(/\s+/g, ' ')
+          .trim()
+          .toLowerCase();
+
+      const canonicalMap = {};
+      Object.keys(configs).forEach((name) => {
+        canonicalMap[normalizeBadgeKey(name)] = name;
+      });
+      canonicalMap['off platform request'] = 'Off-platform request';
+      canonicalMap['off platform contact request'] = 'Off-platform request';
+      canonicalMap['first job $2k+ scam risk'] = 'First Job $2K+ Scam Risk';
+      canonicalMap['first-job $2k+ scam risk'] = 'First Job $2K+ Scam Risk';
+      canonicalMap['poco esfuerzo'] = 'Poco esfuerzo';
+
+      const sourceBadge = String(badge || '').trim();
+      const sourceNormalized = normalizeBadgeKey(sourceBadge);
+      const resolvedBadge = canonicalMap[sourceNormalized] || sourceBadge;
+      const mappedByAlias = resolvedBadge !== sourceBadge;
+      const isUnknownBadge = !configs[resolvedBadge];
+
+      if (resolvedBadge === 'Possible client names') {
         const names = Array.isArray(rawData?.possibleClientNames)
           ? rawData.possibleClientNames
             .filter((name) => typeof name === 'string' && name.trim().length > 0)
@@ -233,7 +268,7 @@
           configs['Possible client names'].description = this.t('possibleNamesDetected').replace('{names}', names.join(', '));
         }
       }
-      if (badge === 'Niche Avg/hr') {
+      if (resolvedBadge === 'Niche Avg/hr') {
         const supportBadge = rawData?.supportAvgBadge || null;
         const matches = Array.isArray(supportBadge?.matches) ? supportBadge.matches : [];
         const matchesText = matches
@@ -242,7 +277,7 @@
           .join('\n');
         configs['Niche Avg/hr'].description = matchesText || this.t('supportAvgUnavailable');
       }
-      if (badge === 'Skills match') {
+      if (resolvedBadge === 'Skills match') {
         const match = rawData?.skillsMatch || null;
         if (!match || !match.profileSkillsLoaded) {
           configs['Skills match'].description = this.t('skillsNeedProfile');
@@ -256,7 +291,7 @@
             : `Match ${matchedList.length}: ${matchedText}\nMissing ${missingList.length}: ${missingText}`;
         }
       }
-      const selected = configs[badge] || { icon: '\u25B9', type: 'neutral', description: badge };
+      const selected = configs[resolvedBadge] || { icon: '\u25B9', type: 'neutral', description: sourceBadge };
       if (this.language === 'en') {
         const enDescriptions = {
           'Gold standard': 'Top signal: strong hire rate, >$10k spent and 4.8+ rating',
@@ -298,13 +333,18 @@
           'Professional Tone': 'Specific and professional request, usually easier to execute well.',
           'Niche Avg/hr': 'Niche hourly position vs feed benchmark (informational).',
         };
-        if (enDescriptions[badge]) {
-          selected.description = enDescriptions[badge];
+        if (enDescriptions[resolvedBadge]) {
+          selected.description = enDescriptions[resolvedBadge];
         }
       }
+      selected._badgeMeta = {
+        sourceBadge,
+        resolvedBadge,
+        mappedByAlias,
+        unknown: isUnknownBadge,
+      };
       return selected;
     }})();
-
 
 
 
