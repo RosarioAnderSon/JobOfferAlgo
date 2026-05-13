@@ -49,3 +49,13 @@
 - En limpieza dirigida, ahora se eliminan overlays/panels legacy y cualquier instancia con `data-job-id` distinto al job objetivo de la card.
 - Se agrego dedupe por card para conservar una sola instancia del overlay/panel del mismo `targetJobId`.
 - Se mantuvo el comportamiento actual de inyeccion route/cache y los logs operativos minimos sin aumentar ruido.
+### Sniper Extension - Fix anti-parpadeo por reinyeccion ciclica en feed
+- Se agrego validacion estricta de `jobId` en href (`~id`) para evitar tomar identificadores no-job y eliminar alternancia de IDs por card.
+- Se reforzo `getCardJobId` para reconciliar `data-sniper-job-id` con señales reales actuales de la card y reescribirlo cuando hay inconsistencia por virtualizacion.
+- Se incorporo guard anti-mutate en cache pass: si la card ya tiene overlay del `jobId` resuelto, se evita cleanup/reinyeccion innecesaria.
+- Se preservo el comportamiento de score, badges, settings y nivel de logging operativo.
+### Sniper Extension - Fix UI overlay bottom-right + score grade
+- Se consolidaron reglas CSS para asegurar que el overlay de badges/score quede en la esquina inferior-derecha en todas las variantes de card del feed.
+- Se extendio la cobertura de contenedores de card con `position: relative` para evitar posicionamiento absoluto referenciado a nodos incorrectos.
+- Se ajusto el badge de score para que `A+ / A-` no se parta en dos lineas, manteniendo misma tipografia y look actual.
+- No hubo cambios en evaluacion de score, inyeccion JS ni nivel de logs.

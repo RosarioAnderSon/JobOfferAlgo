@@ -438,15 +438,30 @@
 }
 
 /* Asegurar prioridad dentro de la card */
-section.air3-card-section .sniper-overlay {
+section.air3-card-section .sniper-overlay,
+div.air3-card .sniper-overlay,
+article.job-tile .sniper-overlay,
+[data-test="job-tile"] .sniper-overlay,
+[data-test*="job-tile"] .sniper-overlay,
+[class*="job-tile"] .sniper-overlay,
+article[class*="job"] .sniper-overlay,
+section[class*="job"] .sniper-overlay {
   top: auto !important;
   bottom: 10px !important;
-  right: 12px;
+  right: 12px !important;
+  left: auto !important;
   transform: none !important;
 }
 
 /* Hacer la card padre relativa para posicionar el overlay */
-section.air3-card-section {
+section.air3-card-section,
+div.air3-card,
+article.job-tile,
+[data-test="job-tile"],
+[data-test*="job-tile"],
+[class*="job-tile"],
+article[class*="job"],
+section[class*="job"] {
   position: relative !important;
 }
 

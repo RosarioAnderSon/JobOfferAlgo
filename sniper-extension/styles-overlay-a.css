@@ -2,6 +2,8 @@
 .sniper-score {
   display: flex;
   align-items: center;
+  flex-wrap: nowrap;
+  white-space: nowrap;
   gap: 2px;
   padding: 6px 11px;
   border-radius: 8px;
@@ -27,12 +29,17 @@
 .sniper-score .score-value {
   font-size: 22px;
   font-weight: 800;
+  line-height: 1;
 }
 
 .sniper-score .score-grade {
   font-size: 16px;
   opacity: 0.9;
   margin-left: 2px;
+  line-height: 1;
+  display: inline-flex;
+  align-items: baseline;
+  white-space: nowrap;
 }
 
 .sniper-score.has-tooltip {

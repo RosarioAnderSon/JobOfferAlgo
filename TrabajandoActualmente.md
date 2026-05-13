@@ -1,4 +1,4 @@
-﻿# TrabajandoActualmente
+# TrabajandoActualmente
 
 ## 2026-05-06 - Fix Sniper overlay/runtime y rate-limit
 - Corregida dependencia de carga en manifest: content-script-methods-flow-overlay.js se ejecuta antes de route/cache.
@@ -55,3 +55,30 @@
 - Se endurecio `cleanupOverlays(card, targetJobId)` para limpieza dirigida por card: cuando hay `targetJobId`, elimina overlays/panels legacy y tambien los de `jobId` distinto.
 - Se aplico politica de instancia unica por card: si hay mas de un overlay/panel del mismo `targetJobId`, se conserva solo el primero y se remueven duplicados.
 - Se mantuvo el flujo existente de route/cache y logs operativos (`Overlay inyectado...`) sin agregar ruido adicional.
+
+## 2026-05-10 - Fix anti-parpadeo por reinyeccion ciclica
+- Se endurecio la validacion de `jobId` en links con `isLikelyJobId` para aceptar solo IDs con forma real de job y descartar `~id` auxiliares.
+- `getCardJobId` ahora reconcilia `data-sniper-job-id` contra señales reales de la card (atributos y links validos) para corregir cards recicladas sin alternancia de ID.
+- En `applyCachedOverlaysToFeed`, se agrego guard anti-mutate por card: si ya existe overlay del mismo `jobId` objetivo, no limpia ni reinyecta.
+- Se mantuvo logging minimo actual (`Overlay inyectado...`) sin aumentar ruido de consola.
+
+## 2026-05-10 - Fix posicion overlay + layout score grade
+- Se reforzo el anclaje CSS de `.sniper-overlay` a esquina inferior-derecha para variantes reales de card (`section/article/data-test/class* job-tile`).
+- Se amplio `position: relative` en contenedores de card para evitar referencias de posicionamiento a bloques superiores.
+- Se corrigio layout de `.sniper-score` para evitar salto de `+/-` a linea inferior: `flex-wrap: nowrap`, `white-space: nowrap` y `line-height` consistente en value/grade.
+- No se modifico logica JS de score, badges, cache ni scheduler.
+
+## 2026-05-12 - Badges compactos con hover panel + fix posición overlay
+
+### Fix posición overlay (root cause final)
+- Causa raíz identificada: `[class*="job-tile"]` en `getFeedJobCards()` estaba matcheando elementos como `h3.job-tile-title` (el título del job). Esto hacía que el overlay se inyectara *dentro* del `H3` del título (arriba a la derecha) en lugar de la card.
+- Se reescribió `getFeedJobCards()` para ignorar explícitamente tags de encabezados (`H1-H6`, `A`, `SPAN`, `P`) y cualquier elemento con "title" en su clase.
+- Se refinó la selección de cards para que capture siempre `section.air3-card-section` o directamente el wrapper `div.air3-card`.
+- `resolveOuterCard()` se simplificó para comprobar el `parentElement` sin escalar fuera de la card real.
+- **Fix desaparición de overlays:** Se arregló `removeOrphanOverlays()`. Como el overlay ahora vive en `div.air3-card`, su función `closest()` estaba ignorándolo y escalando hasta atrapar el feed entero (por culpa del comodín `[data-test*="job-tile"]` matcheando `job-tile-list`). Esto causaba que el limpiador de huérfanos borrara los overlays sanos un segundo después de crearlos. Se corrigió usando selectores estrictos que incluyen `div.air3-card`.
+
+### Badges compactos (badge counter)
+- Se reemplazó la fila de badges individuales por un solo icono contador (`.sniper-badge-counter`) con el número de badges.
+- Al hover del contenedor se muestra el panel vertical con icono, nombre y descripción de cada badge.
+- Ya no se crean elementos `.sniper-badge` individuales; se extraen los datos directamente de `getBadgeConfig()`.
+

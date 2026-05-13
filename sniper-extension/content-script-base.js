@@ -545,7 +545,15 @@
         const raw = String(value || '').trim();
         if (!raw) return null;
         const fromHref = raw.match(/~([A-Za-z0-9]+)/);
-        if (fromHref) return fromHref[1];
+        if (fromHref) {
+          const looksLikeHref = raw.includes('/') || raw.includes('http');
+          if (looksLikeHref && typeof this.isJobDetailsHref === 'function' && !this.isJobDetailsHref(raw)) {
+            return null;
+          }
+          const candidate = fromHref[1];
+          if (typeof this.isLikelyJobId === 'function') return this.isLikelyJobId(candidate) ? candidate : null;
+          return candidate;
+        }
         if (/^[A-Za-z0-9]{18,}$/.test(raw) && (raw.startsWith('0') || /^\d{18,}$/.test(raw))) {
           return raw;
         }
@@ -566,7 +574,9 @@
         if (parsed) return parsed;
       }
 
-      const jobLink = modal.querySelector('a[href*="/details/~"], a[href*="~"]');
+      const jobLink = modal.querySelector(
+        'a[href*="/jobs/"][href*="~"], a[href*="/freelance-jobs/"][href*="~"], a[href*="/details/"][href*="~"], a[href*="/nx/find-work/"][href*="~"]'
+      );
       const href = jobLink?.getAttribute('href') || jobLink?.href || '';
       return parseJobIdCandidate(href);
     }

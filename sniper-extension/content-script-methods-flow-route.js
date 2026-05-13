@@ -257,10 +257,11 @@
     const jobCard = this.findJobCardById(this.currentJobId);
 
     if (jobCard) {
+      const outerCard = typeof this.resolveOuterCard === 'function' ? this.resolveOuterCard(jobCard) : jobCard;
       const now = Date.now();
       if (!this.overlayRenderDebounceByJob) this.overlayRenderDebounceByJob = {};
       const lastRenderAt = Number(this.overlayRenderDebounceByJob[this.currentJobId] || 0);
-      const existingOverlayNow = jobCard.querySelector(`.sniper-overlay[data-job-id="${this.currentJobId}"]`);
+      const existingOverlayNow = outerCard.querySelector(`.sniper-overlay[data-job-id="${this.currentJobId}"]`);
       if (existingOverlayNow && now - lastRenderAt < 3000) {
         logVerbose('FASE 2', `Render evitado por debounce (${this.currentJobId})`);
         return true;
@@ -268,11 +269,12 @@
 
       this.removeOrphanOverlays();
       this.cleanupOverlays(jobCard, this.currentJobId);
+      if (outerCard !== jobCard) this.cleanupOverlays(outerCard, this.currentJobId);
 
-      const existingOverlay = jobCard.querySelector(`.sniper-overlay[data-job-id="${this.currentJobId}"]`);
+      const existingOverlay = outerCard.querySelector(`.sniper-overlay[data-job-id="${this.currentJobId}"]`);
       if (existingOverlay) existingOverlay.remove();
 
-      const legacyOverlay = jobCard.querySelector('.sniper-overlay:not([data-job-id])');
+      const legacyOverlay = outerCard.querySelector('.sniper-overlay:not([data-job-id])');
       if (legacyOverlay) legacyOverlay.remove();
 
       this.injectOverlay(jobCard, result, rawData, this.currentJobId);

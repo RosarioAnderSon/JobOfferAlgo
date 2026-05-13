@@ -1,4 +1,4 @@
-﻿(() => {
+(() => {
   'use strict';
 
   const UpworkSniperExtension = window.UpworkSniperExtension;
@@ -254,12 +254,8 @@
           return;
         }
 
-        // Usar data-sniper-job-id como fuente de verdad si ya fue asignado
-        let jobId = card.getAttribute('data-sniper-job-id');
-        if (!jobId) {
-          jobId = this.getCardJobId(card);
-          if (!jobId) return;
-        }
+        const jobId = this.getCardJobId(card);
+        if (!jobId) return;
 
         const cachedEntry = cache[jobId];
         const stale = this.isCacheEntryBadgeSchemaStale(cachedEntry);
@@ -277,12 +273,23 @@
           return;
         }
 
-        this.cleanupOverlays(card, jobId);
+        // Check both inner card and resolved outer card for existing overlays
+        const outerCard = typeof this.resolveOuterCard === 'function' ? this.resolveOuterCard(card) : card;
+        const existingOverlayForCard = outerCard.querySelector('.sniper-overlay[data-job-id]');
+        if (existingOverlayForCard) {
+          const existingJobId = existingOverlayForCard.getAttribute('data-job-id');
+          if (existingJobId === jobId) {
+            return;
+          }
+        }
 
-        const existingOverlay = card.querySelector(`.sniper-overlay[data-job-id="${jobId}"]`);
+        this.cleanupOverlays(card, jobId);
+        if (outerCard !== card) this.cleanupOverlays(outerCard, jobId);
+
+        const existingOverlay = outerCard.querySelector(`.sniper-overlay[data-job-id="${jobId}"]`);
         if (existingOverlay) return;
 
-        const legacyOverlay = card.querySelector('.sniper-overlay:not([data-job-id])');
+        const legacyOverlay = outerCard.querySelector('.sniper-overlay:not([data-job-id])');
         if (legacyOverlay) return;
 
         this.injectOverlay(card, cached, cachedEntry?.rawData || null, jobId);

@@ -1,4 +1,4 @@
-﻿(() => {
+(() => {
   'use strict';
 
   const UpworkSniperExtension = window.UpworkSniperExtension;
@@ -7,16 +7,52 @@
   const logVerbose = logs.logVerbose || (() => {});
   const logError = logs.logError || (() => {});
 
+  UpworkSniperExtension.prototype.isLikelyJobId = function(value) {
+    const raw = String(value || '').trim();
+    if (!raw) return false;
+    if (!/^[A-Za-z0-9]+$/.test(raw)) return false;
+    if (raw.length < 18) return false;
+    if (raw.startsWith('0')) return true;
+    if (/^\d{18,}$/.test(raw)) return true;
+    return false;
+  };
+
+  UpworkSniperExtension.prototype.isJobDetailsHref = function(href) {
+    const raw = String(href || '').trim();
+    if (!raw) return false;
+
+    let path = raw.toLowerCase();
+    try {
+      path = new URL(raw, window.location.origin).pathname.toLowerCase();
+    } catch (error) {
+      // Relative or malformed hrefs still get filtered by their raw path below.
+    }
+
+    if (path.includes('/freelancers/')) return false;
+    return path.includes('/jobs/') || path.includes('/freelance-jobs/') || path.includes('/details/');
+  };
+
   UpworkSniperExtension.prototype.extractJobIdFromHref = function(href) {
     const source = String(href || '');
     if (!source) return null;
+    if (!this.isJobDetailsHref(source)) return null;
     const match = source.match(/~([A-Za-z0-9]+)/);
-    return match ? match[1] : null;
+    if (!match) return null;
+    const candidate = match[1];
+    return this.isLikelyJobId(candidate) ? candidate : null;
   };
 
   UpworkSniperExtension.prototype.getFeedJobLinks = function(root) {
     const scope = root || document;
-    return Array.from(scope.querySelectorAll('a[href*="~"]'));
+    const selectors = [
+      'a[href*="/jobs/"][href*="~"]',
+      'a[href*="/freelance-jobs/"][href*="~"]',
+      'a[href*="/details/"][href*="~"]',
+      'a[href*="/nx/find-work/"][href*="~"]',
+    ];
+    return Array.from(scope.querySelectorAll(selectors.join(','))).filter((link) =>
+      this.extractJobIdFromHref(link.getAttribute('href') || link.href || '')
+    );
   };
 
   UpworkSniperExtension.prototype.getFeedJobCards = function(root) {
@@ -27,19 +63,23 @@
     const cards = [];
     const seen = new Set();
     const addCard = (node) => {
-      if (!(node instanceof Element)) return;
-      if (isInsideModal(node)) return;
-      if (seen.has(node)) return;
-      seen.add(node);
-      cards.push(node);
+      if (!node || !(node instanceof Element)) return;
+      const canonical = typeof this.resolveOuterCard === 'function' ? this.resolveOuterCard(node) : node;
+      if (!canonical || !(canonical instanceof Element)) return;
+      if (['H1', 'H2', 'H3', 'H4', 'H5', 'H6', 'A', 'SPAN', 'P'].includes(canonical.tagName)) return;
+      const cls = typeof canonical.className === 'string' ? canonical.className : '';
+      if (cls.includes('title')) return;
+      if (isInsideModal(canonical)) return;
+      if (seen.has(canonical)) return;
+      seen.add(canonical);
+      cards.push(canonical);
     };
 
     const strongSelectors = [
       'section.air3-card-section',
       'article.job-tile',
       '[data-test="job-tile"]',
-      '[data-test*="job-tile"]',
-      '[class*="job-tile"]',
+      'div.air3-card'
     ];
     strongSelectors.forEach((selector) => {
       scope.querySelectorAll(selector).forEach((el) => addCard(el));
@@ -47,10 +87,23 @@
 
     const links = this.getFeedJobLinks(scope);
     links.forEach((link) => {
-      const candidate = link.closest(
-        '[data-test="job-tile"], [data-test*="job-tile"], section.air3-card-section, article.job-tile, [class*="job-tile"], article[class*="job"], section[class*="job"]'
-      );
-      if (candidate) addCard(candidate);
+      let current = link.parentElement;
+      while (current && current !== document.body) {
+        if (!['H1', 'H2', 'H3', 'H4', 'H5', 'H6'].includes(current.tagName)) {
+          const cls = typeof current.className === 'string' ? current.className : '';
+          const dataTest = current.getAttribute('data-test') || '';
+          if (
+            current.matches('section.air3-card-section, article.job-tile, [data-test="job-tile"]') ||
+            (cls.includes('job-tile') && !cls.includes('title') && !cls.includes('list')) ||
+            (current.classList && current.classList.contains('air3-card')) ||
+            dataTest === 'job-tile'
+          ) {
+            addCard(current);
+            break;
+          }
+        }
+        current = current.parentElement;
+      }
     });
 
     return cards;
@@ -59,21 +112,47 @@
   UpworkSniperExtension.prototype.getCardJobId = function(card) {
     if (!card) return null;
 
-    const stableAttr = card.getAttribute('data-sniper-job-id');
-    if (stableAttr) return stableAttr;
-
+    const stableAttr = String(card.getAttribute('data-sniper-job-id') || '').trim();
     const directAttrs = ['data-job-id', 'data-opening-uid', 'data-ev-opening_uid'];
+    let attrId = null;
     for (const attr of directAttrs) {
       const value = card.getAttribute(attr);
-      if (value && /^[A-Za-z0-9]+$/.test(value)) {
-        if (value.startsWith('0') || value.length >= 20) return value;
+      if (this.isLikelyJobId(value)) {
+        attrId = String(value).trim();
+        break;
       }
     }
 
+    let linkId = null;
     const links = this.getFeedJobLinks(card);
     for (const link of links) {
       const jobId = this.extractJobIdFromHref(link.getAttribute('href') || link.href || '');
-      if (jobId) return jobId;
+      if (jobId) {
+        linkId = jobId;
+        break;
+      }
+    }
+
+    if (stableAttr && this.isLikelyJobId(stableAttr)) {
+      if (attrId && stableAttr !== attrId) {
+        this.markCardJobId(card, attrId);
+        return attrId;
+      }
+      if (linkId && stableAttr !== linkId && !attrId) {
+        this.markCardJobId(card, linkId);
+        return linkId;
+      }
+      return stableAttr;
+    }
+
+    if (attrId) {
+      this.markCardJobId(card, attrId);
+      return attrId;
+    }
+
+    if (linkId) {
+      this.markCardJobId(card, linkId);
+      return linkId;
     }
 
     return null;
@@ -82,6 +161,23 @@
   UpworkSniperExtension.prototype.markCardJobId = function(card, jobId) {
     if (!card || !jobId) return;
     card.setAttribute('data-sniper-job-id', jobId);
+  };
+
+  UpworkSniperExtension.prototype.getMarkedCardJobId = function(card, preferredJobId = null) {
+    if (!card) return null;
+
+    const ownJobId = String(card.getAttribute('data-sniper-job-id') || '').trim();
+    if (this.isLikelyJobId(ownJobId)) return ownJobId;
+
+    if (preferredJobId && this.isLikelyJobId(preferredJobId)) {
+      const preferredMarker = card.querySelector(`[data-sniper-job-id="${preferredJobId}"]`);
+      if (preferredMarker) return preferredJobId;
+    }
+
+    const markedNode = Array.from(card.querySelectorAll('[data-sniper-job-id]')).find((node) =>
+      this.isLikelyJobId(node.getAttribute('data-sniper-job-id'))
+    );
+    return markedNode ? markedNode.getAttribute('data-sniper-job-id') : null;
   };
 
   UpworkSniperExtension.prototype.cleanupOverlays = function(card, targetJobId = null) {
@@ -147,7 +243,7 @@
     const overlays = Array.from(document.querySelectorAll('.sniper-overlay'));
     overlays.forEach((overlay) => {
       const card = overlay.closest(
-        'section.air3-card-section, article.job-tile, [data-test="job-tile"], [data-test*="job-tile"], [class*="job-tile"], article[class*="job"], section[class*="job"]'
+        'div.air3-card, section.air3-card-section, article.job-tile, [data-test="job-tile"]'
       );
       if (!card || isInsideModal(card)) {
         overlay.remove();
@@ -160,12 +256,8 @@
         return;
       }
 
-      // Usar data-sniper-job-id como fuente de verdad (se guardó en tick 1)
-      let resolvedCardJobId = card.getAttribute('data-sniper-job-id');
-      if (!resolvedCardJobId) {
-        // Fallback: intenta extraerlo nuevamente si el atributo no existe
-        resolvedCardJobId = this.getCardJobId(card);
-      }
+      let resolvedCardJobId = this.getCardJobId(card);
+      if (!resolvedCardJobId) resolvedCardJobId = this.getMarkedCardJobId(card, overlayJobId);
 
       if (!resolvedCardJobId) {
         // DOM virtualizado: conserva overlay hasta poder resolver el job real.
@@ -180,7 +272,7 @@
     const panels = Array.from(document.querySelectorAll('.sniper-left-panel'));
     panels.forEach((panel) => {
       const card = panel.closest(
-        'section.air3-card-section, article.job-tile, [data-test="job-tile"], [data-test*="job-tile"], [class*="job-tile"], article[class*="job"], section[class*="job"]'
+        'div.air3-card, section.air3-card-section, article.job-tile, [data-test="job-tile"]'
       );
       if (!card || isInsideModal(card)) {
         panel.remove();
@@ -193,27 +285,49 @@
         return;
       }
 
-      // Usar data-sniper-job-id como fuente de verdad
-      let resolvedCardJobId = card.getAttribute('data-sniper-job-id');
-      if (!resolvedCardJobId) {
-        resolvedCardJobId = this.getCardJobId(card);
-      }
+      let resolvedCardJobId = this.getCardJobId(card);
+      if (!resolvedCardJobId) resolvedCardJobId = this.getMarkedCardJobId(card, panelJobId);
       if (!resolvedCardJobId) return;
       if (resolvedCardJobId !== panelJobId) panel.remove();
     });
   };
 
+  UpworkSniperExtension.prototype.resolveOuterCard = function(card) {
+    if (!card) return card;
+    const isCardWrapper = (el) => {
+      if (!el || !(el instanceof Element)) return false;
+      if (['H1', 'H2', 'H3', 'H4', 'H5', 'H6'].includes(el.tagName)) return false;
+
+      const hasClass = (name) => el.classList && el.classList.contains(name);
+
+      if (hasClass('air3-card')) return true;
+      if (hasClass('job-tile') && !hasClass('job-tile-title') && !hasClass('job-tile-list')) return true;
+      if (el.hasAttribute('data-test') && el.getAttribute('data-test') === 'job-tile') return true;
+      return false;
+    };
+
+    let current = card;
+    let fallback = null;
+    for (let depth = 0; current && current !== document.body && depth < 5; depth += 1) {
+      if (isCardWrapper(current)) {
+        if (current.classList && current.classList.contains('air3-card')) return current;
+        fallback = fallback || current;
+      }
+      current = current.parentElement;
+    }
+    return fallback || card;
+  };
+
   UpworkSniperExtension.prototype.injectOverlay = function(card, result, rawData, jobId = null) {
     const overlay = document.createElement('div');
     overlay.className = 'sniper-overlay';
+    const targetCard = typeof this.resolveOuterCard === 'function' ? this.resolveOuterCard(card) : card;
 
     if (jobId) {
       overlay.setAttribute('data-job-id', jobId);
       this.markCardJobId(card, jobId);
+      if (targetCard && targetCard !== card) this.markCardJobId(targetCard, jobId);
     }
-
-    const badgesContainer = document.createElement('div');
-    badgesContainer.className = 'sniper-badges';
 
     const displayBadges = [...(result.badges || [])];
     if (rawData?.supportAvgBadge) displayBadges.push('Niche Avg/hr');
@@ -235,16 +349,16 @@
     const unknownBadges = [];
 
     displayBadges.forEach((badge) => {
-      const badgeEl = this.createBadge(badge, rawData);
-      const resolved = badgeEl.getAttribute('data-badge-resolved') || badge;
+      const config = this.getBadgeConfig(badge, rawData) || {};
+      const meta = config._badgeMeta || {};
+      const resolved = meta.resolvedBadge || badge;
       renderedBadges.push(resolved);
-      if (badgeEl.getAttribute('data-badge-alias') === '1') {
+      if (meta.mappedByAlias) {
         aliasMappedBadges.push(`${badge} -> ${resolved}`);
       }
-      if (badgeEl.getAttribute('data-badge-unknown') === '1') {
+      if (meta.unknown) {
         unknownBadges.push(badge);
       }
-      badgesContainer.appendChild(badgeEl);
     });
     logVerbose('DETAIL', `Badges renderizados (${jobId || 'N/A'}): ${renderedBadges.join(' | ')}`);
     if (aliasMappedBadges.length > 0) {
@@ -263,6 +377,62 @@
       }
     }
 
+    // Single compact badge counter with hover panel
+    const badgesContainer = document.createElement('div');
+    badgesContainer.className = 'sniper-badges';
+
+    if (displayBadges.length > 0) {
+      // Single counter badge
+      const counterEl = document.createElement('span');
+      counterEl.className = 'sniper-badge-counter';
+      counterEl.textContent = displayBadges.length;
+      badgesContainer.appendChild(counterEl);
+
+      // Hover panel with all badge details
+      const panel = document.createElement('div');
+      panel.className = 'sniper-badges-panel';
+
+      displayBadges.forEach((badge) => {
+        const config = this.getBadgeConfig(badge, rawData) || {};
+        const meta = config._badgeMeta || {};
+
+        const item = document.createElement('div');
+        item.className = 'sniper-badges-panel-item';
+
+        const iconWrap = document.createElement('span');
+        iconWrap.className = `sniper-badges-panel-icon ${config.type || 'neutral'}`;
+        if (config.iconSvg) {
+          const parser = new DOMParser();
+          const svgDoc = parser.parseFromString(config.iconSvg, 'image/svg+xml');
+          if (svgDoc.documentElement.nodeName !== 'parsererror') {
+            iconWrap.appendChild(svgDoc.documentElement);
+          }
+        } else {
+          iconWrap.textContent = config.icon || '';
+        }
+
+        const textWrap = document.createElement('div');
+        textWrap.className = 'sniper-badges-panel-text';
+
+        const nameEl = document.createElement('div');
+        nameEl.className = 'sniper-badges-panel-name';
+        nameEl.textContent = config.tooltipTitle || meta.resolvedBadge || badge;
+
+        const descEl = document.createElement('div');
+        descEl.className = 'sniper-badges-panel-desc';
+        descEl.textContent = config.description || '';
+
+        textWrap.appendChild(nameEl);
+        textWrap.appendChild(descEl);
+
+        item.appendChild(iconWrap);
+        item.appendChild(textWrap);
+        panel.appendChild(item);
+      });
+
+      badgesContainer.appendChild(panel);
+    }
+
     const scoreEl = this.createScoreBadge(result, rawData);
     const settingsEl = this.createSettingsButton(jobId);
 
@@ -270,8 +440,13 @@
     overlay.appendChild(scoreEl);
     overlay.appendChild(settingsEl);
 
-    card.style.position = 'relative';
-    card.appendChild(overlay);
+    targetCard.style.position = 'relative';
+    // Clean any existing overlay from the resolved target too
+    if (targetCard !== card && jobId) {
+      const existingInTarget = targetCard.querySelector(`.sniper-overlay[data-job-id="${jobId}"]`);
+      if (existingInTarget) existingInTarget.remove();
+    }
+    targetCard.appendChild(overlay);
     this.renderGlobalMissingSkillsSidebar();
   };
 
