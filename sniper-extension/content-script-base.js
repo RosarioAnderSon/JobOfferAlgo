@@ -1,30 +1,137 @@
 (() => {
   'use strict';
-
   // ============================================
   // ANDERSON'S SNIPER EXTENSION - SPA Ready
   // Detecta navegacion en Upwork sin recargar pagina
   // ============================================
-
   const PREFIX = '[Sniper]';
   const DEBUG = true;
   const LOG_LEVEL_KEY = 'sniper-log-level-v1';
+  const FLOW_CONSOLE_KEY = 'sniper-flow-console-v1';
   const BADGE_DIAG_KEY = 'sniper-diag-badges-v1';
+  const ERROR_LOG_KEY = 'sniper-error-log-v1';
+  const FLOW_LOG_KEY = 'sniper-flow-log-v1';
+  const ERROR_LOG_MAX = 120;
+  const FLOW_LOG_MAX = 300;
   const LEGACY_VERBOSE = localStorage.getItem('sniper-debug-verbose-v1') === '1';
   const LOG_LEVEL = (() => {
     const raw = String(localStorage.getItem(LOG_LEVEL_KEY) || '').trim().toLowerCase();
     if (raw === 'verbose' || LEGACY_VERBOSE) return 'verbose';
-    return 'minimal';
+    if (raw === 'error') return 'error';
+    return 'off';
   })();
   const DEBUG_VERBOSE = LOG_LEVEL === 'verbose';
-
+  const DEBUG_ERROR = LOG_LEVEL === 'error' || LOG_LEVEL === 'verbose';
   const colorMap = {
     INIT: '#9C27B0',
     ROUTE: '#FF9800',
     DETAIL: '#2196F3',
     'FASE 2': '#4CAF50',
   };
-
+  const normalizeError = (error) => {
+    if (!error) return null;
+    if (error instanceof Error) {
+      return {
+        name: error.name || 'Error',
+        message: error.message || '',
+        stack: error.stack || '',
+      };
+    }
+    return {
+      name: typeof error,
+      message: String(error),
+      stack: '',
+    };
+  };
+  const readErrorLogBuffer = () => {
+    try {
+      const raw = localStorage.getItem(ERROR_LOG_KEY);
+      if (!raw) return [];
+      const parsed = JSON.parse(raw);
+      return Array.isArray(parsed) ? parsed : [];
+    } catch (_error) {
+      return [];
+    }
+  };
+  const writeErrorLogBuffer = (entries) => {
+    try {
+      localStorage.setItem(ERROR_LOG_KEY, JSON.stringify(entries));
+    } catch (_error) {
+      // No-op: no debemos romper runtime por logger.
+    }
+  };
+  const appendErrorLog = (phase, message, error = null) => {
+    const normalized = normalizeError(error);
+    const currentJobId = window.__sniperCurrentJobId || null;
+    const entry = {
+      ts: new Date().toISOString(),
+      phase: String(phase || 'UNKNOWN'),
+      message: String(message || ''),
+      jobId: normalized?.jobId || null,
+      currentJobId,
+      href: window.location.href,
+      error: normalized,
+    };
+    const next = readErrorLogBuffer();
+    next.push(entry);
+    if (next.length > ERROR_LOG_MAX) {
+      next.splice(0, next.length - ERROR_LOG_MAX);
+    }
+    writeErrorLogBuffer(next);
+    return entry;
+  };
+  const readFlowLogBuffer = () => {
+    try {
+      const raw = localStorage.getItem(FLOW_LOG_KEY);
+      if (!raw) return [];
+      const parsed = JSON.parse(raw);
+      return Array.isArray(parsed) ? parsed : [];
+    } catch (_error) {
+      return [];
+    }
+  };
+  const writeFlowLogBuffer = (entries) => {
+    try {
+      localStorage.setItem(FLOW_LOG_KEY, JSON.stringify(entries));
+    } catch (_error) {
+      // No-op
+    }
+  };
+  const isFlowConsoleEnabled = () => {
+    const flowConsoleEnabled = localStorage.getItem(FLOW_CONSOLE_KEY) === '1';
+    const runtimeLogLevel = String(localStorage.getItem(LOG_LEVEL_KEY) || '').trim().toLowerCase();
+    return flowConsoleEnabled || runtimeLogLevel === 'verbose' || LEGACY_VERBOSE;
+  };
+  const appendFlowLog = (phase, payload = {}) => {
+    const event = {
+      ts: new Date().toISOString(),
+      phase: String(phase || 'unknown'),
+      jobId: payload.jobId || null,
+      currentJobId:
+        Object.prototype.hasOwnProperty.call(payload, 'currentJobId')
+          ? payload.currentJobId
+          : window.__sniperCurrentJobId || null,
+      reason: payload.reason || '',
+      sessionId: Number(payload.sessionId || 0) || 0,
+      url: window.location.href,
+    };
+    const next = readFlowLogBuffer();
+    next.push(event);
+    if (next.length > FLOW_LOG_MAX) {
+      next.splice(0, next.length - FLOW_LOG_MAX);
+    }
+    writeFlowLogBuffer(next);
+    if (DEBUG && isFlowConsoleEnabled()) {
+      console.log(`[Sniper] FLOW: ${event.phase}`, {
+        jobId: event.jobId,
+        currentJobId: event.currentJobId,
+        reason: event.reason,
+        sessionId: event.sessionId,
+        url: event.url,
+      });
+    }
+    return event;
+  };
   const shouldEmitMinimalLog = (phase, message) => {
     const text = String(message || '');
     if (phase === 'ROUTE') {
@@ -35,37 +142,33 @@
     }
     return false;
   };
-
   const log = (phase, message, data = null) => {
     if (!DEBUG) return;
     if (!DEBUG_VERBOSE && !shouldEmitMinimalLog(phase, message)) return;
     const color = colorMap[phase] || '#666';
     console.log(`%c${PREFIX} ${phase}:`, `color: ${color}; font-weight: bold`, message, data || '');
   };
-
   const logSuccess = (message) => {
     if (!DEBUG) return;
     if (!DEBUG_VERBOSE && !String(message || '').startsWith('Overlay inyectado')) return;
     console.log(`%c${PREFIX} OK`, 'color: #66BB6A; font-weight: bold', message);
   };
-
   const logError = (phase, message, error = null) => {
+    appendErrorLog(phase, message, error);
+    if (!DEBUG || !DEBUG_ERROR) return;
     console.error(`%c${PREFIX} ERR ${phase}:`, 'color: #F44336; font-weight: bold', message, error || '');
   };
-
   const logVerbose = (phase, message, data = null) => {
     if (!DEBUG || !DEBUG_VERBOSE) return;
     const color = colorMap[phase] || '#666';
     console.log(`%c${PREFIX} ${phase}:`, `color: ${color}; font-weight: bold`, message, data || '');
   };
-
   const isBadgeDiagEnabled = () => localStorage.getItem(BADGE_DIAG_KEY) === '1';
   const logDiag = (phase, message, data = null) => {
     if (!DEBUG || !isBadgeDiagEnabled()) return;
     const color = '#607D8B';
     console.log(`%c${PREFIX} DIAG ${phase}:`, `color: ${color}; font-weight: bold`, message, data || '');
   };
-
   class UpworkSniperExtension {
     constructor() {
       this.currentJobId = null;
@@ -100,14 +203,17 @@
       this.overlayOrphanCleanupNeeded = true;
       this.overlayOrphanCleanupEveryTicks = 6;
       this.overlayMutationBudgetPerTick = 4;
+      this.detailWatcherSessionId = 0;
+      this.detailWatcherIntervalId = null;
       this.language = localStorage.getItem(this.languageKey) === 'es' ? 'es' : 'en';
       this.cacheMaxEntries = 200;
       this.cacheMaxAgeMs = 12 * 60 * 60 * 1000; // 12 horas
+      window.__sniperCurrentJobId = this.currentJobId;
+      this.flow('init', { reason: 'constructor' });
       log('INIT', "Anderson's Sniper Extension activated");
       log('INIT', 'content-script injected (load check)');
       this.init();
     }
-
     init() {
       this.watchUrlChanges();
       this.watchDetailModalChanges();
@@ -117,7 +223,6 @@
         this.markOverlayActivity('visibility-change');
       });
     }
-
     getOverlayMethodNames() {
       return [
         'applyCachedOverlaysToFeed',
@@ -128,7 +233,42 @@
         'extractJobIdFromHref',
       ];
     }
-
+    normalizeJobIdForCompare(value) {
+      const raw = String(value || '').trim();
+      if (!raw) return '';
+      if (/^\d+$/.test(raw)) {
+        const stripped = raw.replace(/^0+/, '');
+        return stripped || '0';
+      }
+      return raw;
+    }
+    getComparableJobIdVariants(value) {
+      const raw = String(value || '').trim();
+      const variants = new Set();
+      if (!raw) return variants;
+      variants.add(raw);
+      const normalized = this.normalizeJobIdForCompare(raw);
+      if (normalized) variants.add(normalized);
+      if (/^\d+$/.test(raw)) {
+        // Upwork en algunos flujos expone el mismo opening UID con prefijo "02".
+        if (raw.length >= 18 && raw.startsWith('02')) {
+          const without02 = raw.slice(2);
+          const normalizedWithout02 = this.normalizeJobIdForCompare(without02);
+          if (without02) variants.add(without02);
+          if (normalizedWithout02) variants.add(normalizedWithout02);
+        }
+      }
+      return variants;
+    }
+    isSameJobId(a, b) {
+      const leftVariants = this.getComparableJobIdVariants(a);
+      const rightVariants = this.getComparableJobIdVariants(b);
+      if (leftVariants.size === 0 || rightVariants.size === 0) return false;
+      for (const candidate of leftVariants) {
+        if (rightVariants.has(candidate)) return true;
+      }
+      return false;
+    }
     hasOverlayRuntimeReady() {
       const overlayModuleLoaded = window.__sniperOverlayLoaded === true;
       if (!overlayModuleLoaded) {
@@ -139,7 +279,6 @@
         this.overlayMethodsWarnedMissing = false;
         return false;
       }
-
       const missing = this.getOverlayMethodNames().filter((name) => typeof this[name] !== 'function');
       if (missing.length > 0) {
         const missingStatus = `methods-missing:${missing.join(',')}`;
@@ -154,7 +293,6 @@
       this.overlayRuntimeStatus = 'ready';
       return true;
     }
-
     markOverlayActivity(reason = 'activity') {
       const now = Date.now();
       const isDuplicateActivity =
@@ -176,33 +314,26 @@
       }
       this.scheduleOverlayRefresh(220);
     }
-
     startOverlayRefreshScheduler() {
       if (this.overlaySchedulerTimeoutId) clearTimeout(this.overlaySchedulerTimeoutId);
       this.scheduleOverlayRefresh(250);
     }
-
     scheduleOverlayRefresh(delayMs) {
       const baseDelay = Number.isFinite(delayMs) ? Math.max(200, delayMs) : 1500;
       this.overlaySchedulerTimeoutId = setTimeout(() => this.runOverlayRefreshTick(), baseDelay);
     }
-
     getNextOverlayDelay(mutated = false) {
       const jitter = Math.floor(Math.random() * 220);
-
       if (document.hidden) {
         return 8000 + jitter;
       }
-
       if (mutated) {
         this.overlayWarmupTicks = Math.max(this.overlayWarmupTicks, 2);
       }
-
       if (this.overlayWarmupTicks > 0) {
         this.overlayWarmupTicks -= 1;
         return 900 + jitter;
       }
-
       if (this.overlayIdleStreak >= 35) return 12000 + jitter;
       if (this.overlayIdleStreak >= 20) return 9000 + jitter;
       if (this.overlayIdleStreak >= 12) return 6000 + jitter;
@@ -210,27 +341,22 @@
       if (this.overlayIdleStreak >= 3) return 2400 + jitter;
       return 1500 + jitter;
     }
-
     runOverlayRefreshTick() {
       if (this.overlaySchedulerInFlight) {
         this.scheduleOverlayRefresh(1200);
         return;
       }
-
       if (document.hidden) {
         this.scheduleOverlayRefresh(this.getNextOverlayDelay(false));
         return;
       }
-
       if (!this.hasOverlayRuntimeReady()) {
         const retryDelay = this.overlayRuntimeStatus === 'overlay-script-not-loaded' ? 9000 : 4500;
         this.scheduleOverlayRefresh(retryDelay + Math.floor(Math.random() * 350));
         return;
       }
-
       this.overlaySchedulerInFlight = true;
       let mutated = false;
-
       try {
         const result = this.applyCachedOverlaysToFeed();
         mutated = !!(result && typeof result === 'object' && (result.mutated || result.truncated));
@@ -240,145 +366,15 @@
       } finally {
         this.overlaySchedulerInFlight = false;
       }
-
       this.overlayIdleStreak = mutated ? 0 : this.overlayIdleStreak + 1;
       const nextDelay = this.getNextOverlayDelay(mutated);
       this.scheduleOverlayRefresh(nextDelay);
     }
-
-    t(key) {
-      const lang = this.language === 'es' ? 'es' : 'en';
-      const dict = {
-        en: {
-          killed: 'Killed',
-          reasons: 'Reasons:',
-          scoreDetail: 'Score breakdown',
-          base: 'Base',
-          bonus: 'Bonus',
-          penalty: 'Penalty',
-          hireRate: 'Hire rate',
-          spend: 'Spend',
-          rating: 'Rating',
-          activity: 'Activity',
-          proposals: 'Proposals',
-          payment: 'Payment',
-          jobsPosted: 'Jobs posted',
-          noHiresHistory: 'No hire history',
-          noSpendHistory: 'No spend history',
-          ratingBelow: 'Rating {rating}/5 (<4.0) with {reviews} reviews',
-          noRatingBelow: 'No rating or rating <4.0',
-          seenHoursAgo: 'Seen {hours}h ago',
-          noLastViewed: 'No last viewed available (assumed cold)',
-          highCompetition: '{count}+ proposals (high competition)',
-          noProposals: 'No proposals available (assumed high)',
-          paymentUnverified: 'Payment not verified',
-          settings: 'Settings',
-          feedback: 'Send feedback to',
-          possibleNames: 'Possible client names',
-          possibleNamesNoMatch: "Detected from Client's recent history",
-          possibleNamesDetected: '{names}',
-          supportAvgBadge: 'Avg/hr',
-          supportAvgAbove: 'Above benchmark',
-          supportAvgOn: 'On benchmark',
-          supportAvgBelow: 'Below benchmark',
-          supportAvgUnavailable: 'Benchmark unavailable',
-          niche: 'Niche',
-          nicheCustomerService: 'Customer Service',
-          nicheCustomerSupport: 'Customer Support',
-          nicheCustomerSpecialist: 'Customer Specialist',
-          skillsMatchBadge: 'Skills match',
-          skillsNeedProfile: 'Open your freelancer profile to load skills, then reopen the job.',
-          skillsMissingTitle: 'Missing skills',
-          skillsMissingNone: 'No missing skills',
-          skillsMinScoreLabel: 'Min score',
-          skillsMinScore0: '0+',
-          skillsMinScore50: '50+',
-          skillsMinScore80: '80+',
-          resetSkills: 'Reset skills counters',
-          resetDone: 'Skills counters reset',
-          copyEmail: 'Copy email',
-          emailCopied: 'Email copied',
-          emailCopyFailed: 'Could not copy email',
-          language: 'Language',
-          scoreWeightsTitle: 'Score Weights',
-          scoreWeightsInfo:
-            'Each weight controls how much that part affects the score.\nHigher weight means more impact.\nIf the total is not 100, it is adjusted automatically.',
-          scoreWeightsCurrentTotal: 'Current total weight: {total}',
-          saveWeights: 'Save Changes',
-          resetWeights: 'Reset',
-          weightsSavedDone: 'Changes saved',
-          weightsResetDone: 'Weights reset',
-        },
-        es: {
-          killed: 'Eliminado',
-          reasons: 'Motivos:',
-          scoreDetail: 'Detalle del score',
-          base: 'Base',
-          bonus: 'Bonus',
-          penalty: 'Penalty',
-          hireRate: 'Tasa de contrato',
-          spend: 'Gasto total',
-          rating: 'Calificación',
-          activity: 'Actividad',
-          proposals: 'Propuestas',
-          payment: 'Pago',
-          jobsPosted: 'Trabajos pub.',
-          noHiresHistory: 'Sin historial de hires',
-          noSpendHistory: 'Sin gasto histórico',
-          ratingBelow: 'Rating {rating}/5 (<4.0) con {reviews} reviews',
-          noRatingBelow: 'Sin rating o rating <4.0',
-          seenHoursAgo: 'Visto hace {hours}h',
-          noLastViewed: 'Sin "last viewed" visible (asumido frío)',
-          highCompetition: '{count}+ propuestas (competencia alta)',
-          noProposals: 'Propuestas no disponibles (asumidas altas)',
-          paymentUnverified: 'Payment no verificado',
-          settings: 'Ajustes',
-          feedback: 'Enviar feedback a',
-          possibleNames: 'Posibles nombres del cliente',
-          possibleNamesNoMatch: 'Detectado desde el historial reciente del cliente',
-          possibleNamesDetected: '{names}',
-          supportAvgBadge: 'Avg/hr',
-          supportAvgAbove: 'Por encima del benchmark',
-          supportAvgOn: 'En el benchmark',
-          supportAvgBelow: 'Por debajo del benchmark',
-          supportAvgUnavailable: 'Benchmark no disponible',
-          niche: 'Niche',
-          nicheCustomerService: 'Customer Service',
-          nicheCustomerSupport: 'Customer Support',
-          nicheCustomerSpecialist: 'Customer Specialist',
-          skillsMatchBadge: 'Match de skills',
-          skillsNeedProfile: 'Abre tu perfil freelancer para cargar skills y luego vuelve a abrir el job.',
-          skillsMissingTitle: 'Skills faltantes',
-          skillsMissingNone: 'No faltan skills',
-          skillsMinScoreLabel: 'Score mínimo',
-          skillsMinScore0: '0+',
-          skillsMinScore50: '50+',
-          skillsMinScore80: '80+',
-          resetSkills: 'Reset contadores de skills',
-          resetDone: 'Contadores de skills reiniciados',
-          copyEmail: 'Copiar correo',
-          emailCopied: 'Correo copiado',
-          emailCopyFailed: 'No se pudo copiar el correo',
-          language: 'Idioma',
-          scoreWeightsTitle: 'Valores del Algoritmo',
-          scoreWeightsInfo:
-            'Cada peso define cuanto influye esa parte en el score.\nMas peso significa mas impacto.\nSi el total no es 100, se ajusta automaticamente.',
-          scoreWeightsCurrentTotal: 'Peso total actual: {total}',
-          saveWeights: 'Guardar',
-          resetWeights: 'Restaurar',
-          weightsSavedDone: 'Cambios guardados',
-          weightsResetDone: 'Pesos restaurados',
-        },
-      };
-      return (dict[lang] && dict[lang][key]) || key;
-    }
-
     setLanguage(lang) {
       this.language = lang === 'es' ? 'es' : 'en';
       localStorage.setItem(this.languageKey, this.language);
       this.refreshOverlaysFromCache();
     }
-
     getDefaultWeights() {
       return {
         hireRate: { weight: 30, thresholds: { A: 90, B: 70, C: 50 } },
@@ -390,12 +386,10 @@
         jobs: { weight: 5, thresholds: { A: 10, B: 1 } },
       };
     }
-
     getScoreWeights() {
       try {
         const stored = localStorage.getItem(this.weightsKey);
         if (stored) return JSON.parse(stored);
-
         // Migration from v1
         const rawV1 = localStorage.getItem('sniper-score-weights-v1');
         if (rawV1) {
@@ -414,186 +408,51 @@
       }
       return this.getDefaultWeights();
     }
-
     setScoreWeights(weights, skipRefresh = false) {
       localStorage.setItem(this.weightsKey, JSON.stringify(weights));
       if (!skipRefresh) this.refreshOverlaysFromCache();
     }
-
     resetScoreWeights() {
       localStorage.removeItem(this.weightsKey);
       this.refreshOverlaysFromCache();
     }
-
     hasSeenWeightsUpdate() {
       const currentVersion = chrome.runtime.getManifest().version;
       const seenVersion = localStorage.getItem(this.weightsSeenVersionKey);
       return seenVersion === currentVersion;
     }
-
     markWeightsUpdateSeen() {
       const currentVersion = chrome.runtime.getManifest().version;
       localStorage.setItem(this.weightsSeenVersionKey, currentVersion);
     }
-
-    watchUrlChanges() {
-      log('INIT', 'Observando cambios de URL para SPA navigation');
-
-      // popstate para navegacion del historial
-      window.addEventListener('popstate', () => this.onUrlChange('popstate'));
-
-      // interceptar pushState / replaceState
-      const originalPushState = history.pushState;
-      const originalReplaceState = history.replaceState;
-
-      history.pushState = (...args) => {
-        const res = originalPushState.apply(history, args);
-        this.onUrlChange('pushState');
-        return res;
-      };
-
-      history.replaceState = (...args) => {
-        const res = originalReplaceState.apply(history, args);
-        this.onUrlChange('replaceState');
-        return res;
-      };
-    }
-
-    watchDetailModalChanges() {
-      if (this.modalDetailObserver) return;
-      const observerTarget = document.body || document.documentElement;
-      if (!observerTarget) return;
-
-      this.modalDetailObserver = new MutationObserver(() => {
-        const modal = document.querySelector(
-          '[role="dialog"].air3-slider-job-details, .air3-slider-job-details, .job-details-content'
-        );
-        if (!modal) return;
-
-        const now = Date.now();
-        const modalSignature =
-          modal.getAttribute('data-opening-uid') ||
-          modal.getAttribute('data-ev-opening_uid') ||
-          modal.getAttribute('data-job-id') ||
-          '';
-        const signature = `${window.location.href}|${modalSignature}`;
-        if (signature === this.lastModalDetailProbeSignature && now - this.lastModalDetailProbeAt < 900) {
-          return;
-        }
-        this.lastModalDetailProbeSignature = signature;
-        this.lastModalDetailProbeAt = now;
-        this.checkCurrentPage();
-      });
-
-      this.modalDetailObserver.observe(observerTarget, {
-        childList: true,
-        subtree: true,
-        attributes: true,
-        attributeFilter: ['data-opening-uid', 'data-ev-opening_uid', 'data-job-id'],
-      });
-    }
-
-    onUrlChange(trigger = 'unknown') {
-      const url = window.location.href;
-      const now = Date.now();
-      if (url === this.lastUrlChangeHandledUrl && now - this.lastUrlChangeHandledAt < 900) {
-        logVerbose('ROUTE', `Cambio de URL duplicado ignorado (${trigger}) -> ${url}`);
-        return;
-      }
-      this.lastUrlChangeHandledUrl = url;
-      this.lastUrlChangeHandledAt = now;
-      this.lastUrl = url;
-      log('ROUTE', `Cambio de URL detectado -> ${url}`);
-      this.markOverlayActivity('url-change');
-      this.checkCurrentPage();
-    }
-
-    checkCurrentPage() {
-      const url = window.location.href;
-      const detailMatch = url.match(/\/details\/~([A-Za-z0-9]+)/);
-      const modalJobId = this.getOpenModalJobId();
-      const jobId = detailMatch?.[1] || modalJobId;
-
-      if (jobId) {
-        if (jobId === this.currentJobId) {
-          log('DETAIL', `Job ${jobId} ya procesado, saltando`);
-          return;
-        }
-
-        this.currentJobId = jobId;
-        log('DETAIL', `Detectado job detail: ${jobId}`);
-        this.markOverlayActivity('job-detail-open');
-        this.waitForJobContent(jobId);
-      } else {
-        this.currentJobId = null;
-        if (this.isFreelancerProfilePage()) {
-          log('ROUTE', 'Freelancer profile detectado, extrayendo skills de perfil');
-          this.captureFreelancerProfileSkills();
-          return;
-        }
-        log('ROUTE', 'No estamos en un job detail');
-      }
-    }
-
-    getOpenModalJobId() {
-      const modal = document.querySelector(
-        '[role="dialog"].air3-slider-job-details, .air3-slider-job-details, .job-details-content'
-      );
-      if (!modal) return null;
-
-      const parseJobIdCandidate = (value) => {
-        const raw = String(value || '').trim();
-        if (!raw) return null;
-        const fromHref = raw.match(/~([A-Za-z0-9]+)/);
-        if (fromHref) {
-          const looksLikeHref = raw.includes('/') || raw.includes('http');
-          if (looksLikeHref && typeof this.isJobDetailsHref === 'function' && !this.isJobDetailsHref(raw)) {
-            return null;
-          }
-          const candidate = fromHref[1];
-          if (typeof this.isLikelyJobId === 'function') return this.isLikelyJobId(candidate) ? candidate : null;
-          return candidate;
-        }
-        if (/^[A-Za-z0-9]{18,}$/.test(raw) && (raw.startsWith('0') || /^\d{18,}$/.test(raw))) {
-          return raw;
-        }
-        return null;
-      };
-
-      const modalAndNestedNodes = [
-        modal,
-        ...Array.from(modal.querySelectorAll('[data-opening-uid], [data-ev-opening_uid], [data-job-id]')),
-      ];
-      for (const node of modalAndNestedNodes) {
-        if (!(node instanceof Element)) continue;
-        const attrCandidate =
-          node.getAttribute('data-opening-uid') ||
-          node.getAttribute('data-ev-opening_uid') ||
-          node.getAttribute('data-job-id');
-        const parsed = parseJobIdCandidate(attrCandidate);
-        if (parsed) return parsed;
-      }
-
-      const jobLink = modal.querySelector(
-        'a[href*="/jobs/"][href*="~"], a[href*="/freelance-jobs/"][href*="~"], a[href*="/details/"][href*="~"], a[href*="/nx/find-work/"][href*="~"]'
-      );
-      const href = jobLink?.getAttribute('href') || jobLink?.href || '';
-      return parseJobIdCandidate(href);
-    }
-
     isBadgeDiagEnabled() {
       return localStorage.getItem(this.badgeDiagFlagKey || BADGE_DIAG_KEY) === '1';
     }
-
     diagBadge(message, data = null) {
       logDiag('BADGES', message, data);
     }
-
-    isFreelancerProfilePage() {
-      return /\/freelancers\/~[A-Za-z0-9]+/i.test(window.location.pathname || '');
+    flow(phase, payload = {}) {
+      return appendFlowLog(phase, payload);
+    }
+    getErrorLogs() {
+      return readErrorLogBuffer();
+    }
+    clearErrorLogs() {
+      writeErrorLogBuffer([]);
+    }
+    exportErrorLogs() {
+      return JSON.stringify(readErrorLogBuffer());
+    }
+    getFlowLogs() {
+      return readFlowLogBuffer();
+    }
+    clearFlowLogs() {
+      writeFlowLogBuffer([]);
+    }
+    exportFlowLogs() {
+      return JSON.stringify(readFlowLogBuffer());
     }
   }
-
   window.UpworkSniperExtension = UpworkSniperExtension;
   window.SniperLog = {
     log,
@@ -604,5 +463,15 @@
     isVerbose: DEBUG_VERBOSE,
     logLevel: LOG_LEVEL,
     isBadgeDiagEnabled,
+  };
+  window.SniperErrorLog = {
+    getErrors: () => readErrorLogBuffer(),
+    clearErrors: () => writeErrorLogBuffer([]),
+    exportErrors: () => JSON.stringify(readErrorLogBuffer()),
+  };
+  window.SniperFlowLog = {
+    getEvents: () => readFlowLogBuffer(),
+    clearEvents: () => writeFlowLogBuffer([]),
+    exportEvents: () => JSON.stringify(readFlowLogBuffer()),
   };
 })();

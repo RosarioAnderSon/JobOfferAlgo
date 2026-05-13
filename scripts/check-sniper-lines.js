@@ -2,22 +2,31 @@ const fs = require('fs');
 const path = require('path');
 
 const root = process.cwd();
-const dir = path.join(root, 'sniper-extension');
 const maxLines = 300;
-const sourceExts = new Set(['.js', '.css']);
+const sourceExts = new Set(['.js', '.css', '.ts']);
+const roots = ['sniper-extension', 'src'];
 
-const files = fs
-  .readdirSync(dir, { withFileTypes: true })
-  .filter((d) => d.isFile())
-  .map((d) => d.name)
-  .filter((name) => sourceExts.has(path.extname(name).toLowerCase()))
-  .sort();
+const walk = (dir) => {
+  const out = [];
+  for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+    const full = path.join(dir, entry.name);
+    if (entry.isDirectory()) {
+      out.push(...walk(full));
+      continue;
+    }
+    const ext = path.extname(entry.name).toLowerCase();
+    if (sourceExts.has(ext)) out.push(full);
+  }
+  return out;
+};
+
+const files = roots.flatMap((name) => walk(path.join(root, name))).sort();
 
 const violations = [];
 
-for (const name of files) {
-  const full = path.join(dir, name);
+for (const full of files) {
   const lines = fs.readFileSync(full, 'utf8').replace(/\r\n/g, '\n').split('\n').length;
+  const name = path.relative(root, full).replace(/\\/g, '/');
   if (lines > maxLines) violations.push({ name, lines });
 }
 

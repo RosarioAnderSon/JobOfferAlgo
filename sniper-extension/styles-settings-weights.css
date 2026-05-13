@@ -1,0 +1,137 @@
+/* Settings weights controls */
+.sniper-weights-container {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 8px;
+}
+
+.sniper-weight-group {
+  display: flex;
+  flex-direction: column;
+}
+
+.sniper-weight-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.9);
+}
+
+.sniper-threshold-toggle {
+  background: none;
+  border: none;
+  color: #aaa;
+  cursor: pointer;
+  padding: 0 4px 0 0;
+  font-size: 10px;
+  line-height: 1;
+}
+
+.sniper-threshold-toggle:hover {
+  color: #fff;
+}
+
+.sniper-thresholds-panel {
+  padding-left: 16px;
+  margin-top: 4px;
+  border-left: 1px solid rgba(255, 255, 255, 0.15);
+}
+
+.sniper-threshold-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 10px;
+  color: rgba(255, 255, 255, 0.7);
+  margin-bottom: 3px;
+}
+
+.sniper-thresh-input {
+  width: 50px;
+  padding: 1px 3px;
+  font-size: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  background: rgba(0, 0, 0, 0.2);
+}
+
+.sniper-input-wrap {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.sniper-input-unit {
+  font-size: 10px;
+  color: rgba(255, 255, 255, 0.5);
+  width: 12px;
+}
+
+.sniper-weight-input {
+  width: 50px;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  color: #fff;
+  border-radius: 4px;
+  padding: 2px 4px;
+  font-size: 11px;
+  text-align: right;
+}
+
+.sniper-weights-actions {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.sniper-save-weights-btn,
+.sniper-reset-weights-btn {
+  flex: 1;
+  padding: 4px;
+  font-size: 11px;
+  border-radius: 4px;
+  border: none;
+  cursor: pointer;
+  font-weight: 500;
+  text-align: center;
+}
+
+.sniper-save-weights-btn {
+  background: rgba(76, 175, 80, 0.3);
+  color: #fff;
+  border: 1px solid rgba(76, 175, 80, 0.6);
+}
+
+.sniper-save-weights-btn:hover {
+  background: rgba(76, 175, 80, 0.5);
+}
+
+.sniper-reset-weights-btn {
+  background: rgba(255, 255, 255, 0.1);
+  color: #ccc;
+  border: 1px solid rgba(255, 255, 255, 0.22);
+}
+
+.sniper-reset-weights-btn:hover {
+  background: rgba(255, 255, 255, 0.2);
+  color: #fff;
+}
+
+.sniper-settings-feedback a {
+  color: #8ec9ff;
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.sniper-settings-copy-status {
+  min-height: 14px;
+  margin-top: 4px;
+  font-size: 10px;
+  color: #9be7a5;
+}
+
+.sniper-settings-copy-status.is-error {
+  color: #ff9e9e;
+}

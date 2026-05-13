@@ -1,17 +1,14 @@
 (() => {
   'use strict';
-
   const UpworkSniperExtension = window.UpworkSniperExtension;
   if (!UpworkSniperExtension) return;
   const logs = window.SniperLog || {};
   const logSuccess = logs.logSuccess || (() => {});
   const logError = logs.logError || (() => {});
-
   UpworkSniperExtension.prototype.getBadgeSchemaVersion = function() {
     const parsed = Number(this.badgeSchemaVersion);
     return Number.isFinite(parsed) && parsed > 0 ? Math.floor(parsed) : 1;
   };
-
   UpworkSniperExtension.prototype.isCacheEntryBadgeSchemaStale = function(entry) {
     if (!entry || typeof entry !== 'object') return true;
     const current = this.getBadgeSchemaVersion();
@@ -19,11 +16,9 @@
     if (!Number.isFinite(entryVersion)) return true;
     return Math.floor(entryVersion) < current;
   };
-
   UpworkSniperExtension.prototype.pruneCache = function(cache) {
     const now = Date.now();
     let changed = false;
-
     Object.keys(cache).forEach((id) => {
       const ts = cache[id]?.ts;
       if (!ts || now - ts > this.cacheMaxAgeMs) {
@@ -31,7 +26,6 @@
         changed = true;
       }
     });
-
     const ids = Object.keys(cache);
     if (ids.length > this.cacheMaxEntries) {
       ids
@@ -42,10 +36,8 @@
           changed = true;
         });
     }
-
     return changed;
   };
-
   UpworkSniperExtension.prototype.loadCache = function() {
     try {
       const raw = localStorage.getItem(this.cacheKey);
@@ -60,7 +52,6 @@
       return {};
     }
   };
-
   UpworkSniperExtension.prototype.saveCache = function(cache) {
     const isQuotaError = (error) =>
       !!error &&
@@ -68,7 +59,6 @@
         error.code === 22 ||
         error.code === 1014 ||
         /quota/i.test(String(error.message || '')));
-
     const compactForStorage = (source) => {
       const compacted = {};
       Object.keys(source || {}).forEach((jobId) => {
@@ -85,14 +75,12 @@
       });
       return compacted;
     };
-
     const trimOldestEntries = (source, keepCount) => {
       const next = { ...(source || {}) };
       const ids = Object.keys(next).sort((a, b) => (next[b]?.ts || 0) - (next[a]?.ts || 0));
       ids.slice(keepCount).forEach((id) => delete next[id]);
       return next;
     };
-
     try {
       localStorage.setItem(this.cacheKey, JSON.stringify(cache));
     } catch (e) {
@@ -100,7 +88,6 @@
         logError('CACHE', 'No se pudo guardar cache', e);
         return;
       }
-
       // Fallback 1: compactar payload para guardar lo esencial.
       try {
         const compacted = compactForStorage(cache);
@@ -112,7 +99,6 @@
           return;
         }
       }
-
       // Fallback 2: poda agresiva de entradas antiguas y reintento.
       try {
         const ids = Object.keys(cache || {});
@@ -124,13 +110,13 @@
       }
     }
   };
-
   UpworkSniperExtension.prototype.setCachedResult = function(jobId, result, rawData = null) {
     if (!jobId || !result) return;
-
+    if (typeof this.flow === 'function') {
+      this.flow('cache-write', { jobId, reason: `score=${result.finalScore}` });
+    }
     const cache = this.loadCache();
     const now = Date.now();
-
     // Extraer metricas clave para comparacion de estancamiento.
     const currentMetrics = rawData
       ? {
@@ -140,10 +126,8 @@
           unansweredInvites: rawData.unansweredInvites ?? 0,
         }
       : null;
-
     const existing = cache[jobId];
     let metricsHistory = existing?.metricsHistory || [];
-
     // Anadir entrada al historial solo cada 2h para no saturar.
     if (currentMetrics) {
       const lastEntry = metricsHistory[metricsHistory.length - 1];
@@ -155,7 +139,6 @@
         metricsHistory = metricsHistory.slice(-14);
       }
     }
-
     cache[jobId] = {
       result,
       rawData,
@@ -167,25 +150,20 @@
       const badgeList = Array.isArray(result.badges) ? result.badges : [];
       this.diagBadge(`cache-write jobId=${jobId} badgeCount=${badgeList.length} stale=false`, badgeList);
     }
-
     this.pruneCache(cache);
     this.saveCache(cache);
   };
-
   UpworkSniperExtension.prototype.getCachedResult = function(jobId) {
     const cache = this.loadCache();
     return cache[jobId]?.result || null;
   };
-
   // Calcula cuantos dias han pasado desde la ultima vez que las metricas cambiaron.
   UpworkSniperExtension.prototype.getStagnantDays = function(jobId) {
     const cache = this.loadCache();
     const entry = cache[jobId];
     if (!entry?.metricsHistory || entry.metricsHistory.length < 2) return 0;
-
     const history = entry.metricsHistory;
     const latest = history[history.length - 1];
-
     for (let i = history.length - 2; i >= 0; i--) {
       const older = history[i];
       const hasChange =
@@ -193,34 +171,31 @@
         older.interviewing !== latest.interviewing ||
         older.invitesSent !== latest.invitesSent ||
         older.unansweredInvites !== latest.unansweredInvites;
-
       if (hasChange) {
         const nextEntry = history[i + 1];
         const daysSinceChange = (Date.now() - nextEntry.ts) / (24 * 60 * 60 * 1000);
         return Math.floor(daysSinceChange);
       }
     }
-
     const firstEntry = history[0];
     const daysSinceFirst = (Date.now() - firstEntry.ts) / (24 * 60 * 60 * 1000);
     return Math.floor(daysSinceFirst);
   };
-
   UpworkSniperExtension.prototype.applyCachedOverlaysToFeed = function() {
+    if (typeof this.flow === 'function') {
+      this.flow('feed-pass-start', { reason: 'applyCachedOverlaysToFeed' });
+    }
     if (this.overlayFeedPassInProgress) {
       return { mutated: false, skipped: 'locked' };
     }
     this.overlayFeedPassInProgress = true;
-
     let mutated = false;
     let mutatedCount = 0;
     let truncated = false;
-
     try {
       if (typeof this.hasOverlayRuntimeReady === 'function' && !this.hasOverlayRuntimeReady()) {
         return { mutated: false, skipped: 'missing-methods' };
       }
-
       this.overlayFeedTickCount = (this.overlayFeedTickCount || 0) + 1;
       const cleanupEvery = Number(this.overlayOrphanCleanupEveryTicks) > 0 ? Number(this.overlayOrphanCleanupEveryTicks) : 6;
       const shouldCleanupOrphans =
@@ -229,9 +204,11 @@
         this.removeOrphanOverlays();
         this.overlayOrphanCleanupNeeded = false;
       }
-
       const cache = this.loadCache();
       if (Object.keys(cache).length === 0) {
+        if (typeof this.flow === 'function') {
+          this.flow('cache-miss', { reason: 'empty-cache' });
+        }
         const hasSniperUi = !!document.querySelector('.sniper-overlay, .sniper-left-panel, .sniper-global-missing-skills');
         if (!hasSniperUi) {
           return { mutated: false, cards: 0, skipped: 'empty-cache-no-ui' };
@@ -239,28 +216,31 @@
         this.renderGlobalMissingSkillsSidebar();
         return { mutated: false, cards: 0 };
       }
-
       const cards =
         typeof this.getFeedJobCards === 'function'
           ? this.getFeedJobCards(document)
           : Array.from(document.querySelectorAll('section.air3-card-section, article.job-tile, [data-test="job-tile"]'));
-
       const budgetRaw = Number(this.overlayMutationBudgetPerTick);
       const mutationBudget = Number.isFinite(budgetRaw) && budgetRaw > 0 ? Math.floor(budgetRaw) : 4;
-
       cards.forEach((card) => {
         if (mutatedCount >= mutationBudget) {
           truncated = true;
           return;
         }
-
         const jobId = this.getCardJobId(card);
         if (!jobId) return;
-
         const cachedEntry = cache[jobId];
         const stale = this.isCacheEntryBadgeSchemaStale(cachedEntry);
         const cached = cachedEntry?.result;
-        if (!cached) return;
+        if (!cached) {
+          if (typeof this.flow === 'function') {
+            this.flow('cache-miss', { jobId, reason: 'entry-without-result' });
+          }
+          return;
+        }
+        if (typeof this.flow === 'function') {
+          this.flow('cache-hit', { jobId, reason: stale ? 'stale' : 'fresh' });
+        }
         if (stale) {
           const staleOverlay = card.querySelector(`.sniper-overlay[data-job-id="${jobId}"]`);
           if (staleOverlay) staleOverlay.remove();
@@ -272,27 +252,56 @@
           }
           return;
         }
-
         // Check both inner card and resolved outer card for existing overlays
         const outerCard = typeof this.resolveOuterCard === 'function' ? this.resolveOuterCard(card) : card;
         const existingOverlayForCard = outerCard.querySelector('.sniper-overlay[data-job-id]');
         if (existingOverlayForCard) {
           const existingJobId = existingOverlayForCard.getAttribute('data-job-id');
-          if (existingJobId === jobId) {
+          const isSameExistingJob =
+            typeof this.isSameJobId === 'function'
+              ? this.isSameJobId(existingJobId, jobId)
+              : String(existingJobId || '').trim() === String(jobId || '').trim();
+          if (isSameExistingJob) {
+            if (typeof this.flow === 'function') {
+              this.flow('overlay-retained-check', {
+                rawOverlayJobId: existingJobId || null,
+                rawResolvedCardJobId: jobId || null,
+                normalizedOverlayJobId:
+                  typeof this.normalizeJobIdForCompare === 'function'
+                    ? this.normalizeJobIdForCompare(existingJobId)
+                    : existingJobId || null,
+                normalizedResolvedCardJobId:
+                  typeof this.normalizeJobIdForCompare === 'function'
+                    ? this.normalizeJobIdForCompare(jobId)
+                    : jobId || null,
+                variantsOverlay:
+                  typeof this.getComparableJobIdVariants === 'function'
+                    ? Array.from(this.getComparableJobIdVariants(existingJobId))
+                    : existingJobId
+                      ? [String(existingJobId)]
+                      : [],
+                variantsResolved:
+                  typeof this.getComparableJobIdVariants === 'function'
+                    ? Array.from(this.getComparableJobIdVariants(jobId))
+                    : jobId
+                      ? [String(jobId)]
+                      : [],
+                reason: 'dedupe-existing-overlay',
+              });
+            }
             return;
           }
         }
-
         this.cleanupOverlays(card, jobId);
         if (outerCard !== card) this.cleanupOverlays(outerCard, jobId);
-
         const existingOverlay = outerCard.querySelector(`.sniper-overlay[data-job-id="${jobId}"]`);
         if (existingOverlay) return;
-
         const legacyOverlay = outerCard.querySelector('.sniper-overlay:not([data-job-id])');
         if (legacyOverlay) return;
-
         this.injectOverlay(card, cached, cachedEntry?.rawData || null, jobId);
+        if (typeof this.flow === 'function') {
+          this.flow('inject-from-cache', { jobId, reason: 'feed-pass' });
+        }
         if (typeof this.diagBadge === 'function' && this.isBadgeDiagEnabled()) {
           const renderedBadges = Array.isArray(cached.badges) ? cached.badges : [];
           this.diagBadge(`cache-read jobId=${jobId} stale=false badgeCount=${renderedBadges.length}`, renderedBadges);
@@ -300,7 +309,6 @@
         mutated = true;
         mutatedCount += 1;
       });
-
       this.renderGlobalMissingSkillsSidebar();
       if (mutatedCount > 0) {
         logSuccess(`Overlay inyectado desde cache: ${mutatedCount}`);
@@ -311,6 +319,9 @@
       return { mutated: false, error: true };
     } finally {
       this.overlayFeedPassInProgress = false;
+      if (typeof this.flow === 'function') {
+        this.flow('feed-pass-end', { reason: 'complete' });
+      }
     }
   };
 })();

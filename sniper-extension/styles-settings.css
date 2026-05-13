@@ -1,0 +1,187 @@
+/* Settings panel shell */
+.sniper-settings-wrap {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.sniper-settings-btn {
+  width: 24px;
+  height: 24px;
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  background: rgba(20, 20, 20, 0.75);
+  color: #fff;
+  border-radius: 999px;
+  cursor: pointer;
+  font-size: 13px;
+  line-height: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.sniper-settings-btn.has-update::after {
+  content: '';
+  position: absolute;
+  top: -2px;
+  right: -2px;
+  width: 8px;
+  height: 8px;
+  background-color: #F44336;
+  border-radius: 50%;
+  border: 1px solid #121212;
+}
+
+.sniper-settings-label.has-update {
+  position: relative;
+  display: inline-block;
+  padding-right: 12px;
+}
+
+.sniper-settings-label.has-update::after {
+  content: '';
+  position: absolute;
+  top: 1px;
+  right: 2px;
+  width: 6px;
+  height: 6px;
+  background-color: #F44336;
+  border-radius: 50%;
+}
+
+.sniper-settings-panel {
+  position: absolute;
+  right: 0;
+  bottom: 30px;
+  width: 220px;
+  padding: 10px;
+  border-radius: 8px;
+  background: rgba(18, 18, 18, 0.95);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  color: #fff;
+  display: none;
+  z-index: 1200;
+}
+
+.sniper-settings-panel.open {
+  display: block;
+}
+
+.sniper-settings-label {
+  font-size: 11px;
+  margin-bottom: 6px;
+  opacity: 0.9;
+}
+
+.sniper-weights-label-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+}
+
+.sniper-weights-label-text {
+  min-width: 0;
+}
+
+.sniper-weights-info-wrap {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+}
+
+.sniper-weights-info-trigger {
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  background: rgba(255, 255, 255, 0.08);
+  color: #fff;
+  border-radius: 999px;
+  width: 18px;
+  height: 18px;
+  padding: 0;
+  font-size: 10px;
+  line-height: 1;
+  cursor: help;
+}
+
+.sniper-weights-info-trigger:focus-visible {
+  outline: 1px solid rgba(142, 201, 255, 0.95);
+  outline-offset: 1px;
+}
+
+.sniper-weights-info-tooltip {
+  position: absolute;
+  right: 0;
+  bottom: calc(100% + 6px);
+  width: 192px;
+  display: none;
+  padding: 6px 7px;
+  border-radius: 6px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  background: rgba(14, 14, 14, 0.98);
+  color: rgba(255, 255, 255, 0.95);
+  font-size: 10px;
+  line-height: 1.35;
+  white-space: pre-line;
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.35);
+  z-index: 6;
+  pointer-events: none;
+}
+
+.sniper-weights-info-wrap:hover .sniper-weights-info-tooltip,
+.sniper-weights-info-wrap:focus-within .sniper-weights-info-tooltip {
+  display: block;
+}
+
+.sniper-settings-lang-row {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 8px;
+}
+
+.sniper-lang-btn {
+  flex: 1;
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  background: rgba(255, 255, 255, 0.08);
+  color: #fff;
+  border-radius: 6px;
+  padding: 4px 0;
+  cursor: pointer;
+  font-size: 11px;
+}
+
+.sniper-lang-btn.active {
+  background: rgba(30, 136, 229, 0.5);
+}
+
+.sniper-settings-feedback {
+  font-size: 11px;
+  line-height: 1.35;
+}
+.sniper-settings-select {
+  width: 100%;
+  margin-bottom: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  background: rgba(255, 255, 255, 0.08);
+  color: #fff;
+  border-radius: 6px;
+  padding: 5px 6px;
+  font-size: 11px;
+}
+.sniper-settings-select option {
+  background: #1e1e1e;
+  color: #fff;
+}
+
+.sniper-reset-skills-btn {
+  width: 100%;
+  margin-top: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  background: rgba(255, 255, 255, 0.08);
+  color: #fff;
+  border-radius: 6px;
+  padding: 5px 8px;
+  cursor: pointer;
+  font-size: 11px;
+  text-align: center;
+}
+
