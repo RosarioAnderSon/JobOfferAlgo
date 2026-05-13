@@ -47,20 +47,14 @@ export const hireRatePoints = (
 
 export const spendPoints = (
   totalSpent: number,
-  totalHires: number,
-  jobsPosted: number,
-  jobBudget?: number
+  _totalHires: number,
+  _jobsPosted: number,
+  _jobBudget?: number
 ) => {
-  const avgPrice =
-    totalHires > 0
-      ? totalSpent / totalHires
-      : totalSpent === 0 && jobsPosted < 3 && jobBudget
-        ? jobBudget
-        : 0;
-  if (avgPrice >= 1000) return 100;
-  if (avgPrice >= 500) return 90;
-  if (avgPrice >= 200) return 75;
-  if (avgPrice > 0) return 20;
+  if (totalSpent >= 1000) return 100;
+  if (totalSpent >= 500) return 90;
+  if (totalSpent >= 200) return 75;
+  if (totalSpent > 0) return 20;
   return 0;
 };
 
@@ -72,6 +66,7 @@ export const ratingPoints = (rating: number, reviewsCount: number) => {
 };
 
 export const activityPoints = (lastViewed: Date, now: Date) => {
+  if (!(lastViewed instanceof Date) || Number.isNaN(lastViewed.getTime())) return 0;
   const hours = hoursSince(lastViewed, now);
   if (hours < 1) return 100;
   if (hours < 3) return 80;

@@ -42,17 +42,11 @@
     return 0;
   };
 
-  const spendPoints = (totalSpent, totalHires, jobsPosted, jobBudget, thresholds = { A: 1000, B: 500, C: 200 }) => {
-    const avgPrice =
-      totalHires > 0
-        ? totalSpent / totalHires
-        : totalSpent === 0 && jobsPosted < 3 && jobBudget
-          ? jobBudget
-          : 0;
-    if (avgPrice >= thresholds.A) return 100;
-    if (avgPrice >= thresholds.B) return 90;
-    if (avgPrice >= thresholds.C) return 75;
-    if (avgPrice > 0) return 20;
+  const spendPoints = (totalSpent, _totalHires, _jobsPosted, _jobBudget, thresholds = { A: 1000, B: 500, C: 200 }) => {
+    if (totalSpent >= thresholds.A) return 100;
+    if (totalSpent >= thresholds.B) return 90;
+    if (totalSpent >= thresholds.C) return 75;
+    if (totalSpent > 0) return 20;
     return 0;
   };
 
@@ -63,30 +57,18 @@
     return 70;
   };
 
-  const activityPoints = (input, now, thresholds = { fresh: 12, recent: 24 }) => {
-    const hasInteraction =
-      (input.interviewing ?? 0) > 0 ||
-      (input.lastViewed instanceof Date &&
-        !Number.isNaN(input.lastViewed.getTime()) &&
-        hoursSince(input.lastViewed, now) <= 24);
+  const activityPoints = (input, now, thresholds = { fresh: 1, recent: 3 }) => {
+    const lastViewed =
+      input.lastViewed instanceof Date && !Number.isNaN(input.lastViewed.getTime())
+        ? input.lastViewed
+        : null;
+    if (!lastViewed) return 0;
 
-    const postedHours =
-      input.postedAt instanceof Date && !Number.isNaN(input.postedAt.getTime())
-        ? hoursSince(input.postedAt, now)
-        : Infinity;
-
-    // Primeras horas: con interacción A, sin interacción B
-    if (postedHours < thresholds.fresh) {
-      return hasInteraction ? 100 : 85;
-    }
-
-    // Hasta el limite reciente: con o sin interacción = B (si no hay señal, no castigamos a F aún)
-    if (postedHours < thresholds.recent) {
-      return hasInteraction ? 85 : 85;
-    }
-
-    // Más allá del límite reciente: con interacción = B; sin interacción = F
-    if (hasInteraction) return 85;
+    const viewedHours = hoursSince(lastViewed, now);
+    if (viewedHours < thresholds.fresh) return 100;
+    if (viewedHours < thresholds.recent) return 80;
+    if (viewedHours < 24) return 70;
+    if (viewedHours < 48) return 60;
     return 0;
   };
 

@@ -148,3 +148,16 @@
   - `node --check` OK en los 4 archivos tocados.
   - `npm.cmd run check-sniper-guardrails` sigue fallando por issue preexistente: `Support Avg/hr badge config missing`.
   - Warning line-count >300 actualizado: `content-script-base.js` (478), `content-script-methods-cache.js` (328), `content-script-methods-flow-route.js` (440).
+
+### Sniper Extension - Fix scoring de Gasto/Actividad/Proposals
+- Se corrigio `Gasto total` en score base para que use `totalSpent` directo; ya no depende de `totalSpent/totalHires` para la calificacion del componente `spend`.
+- Se ajusto `Activity` para depender exclusivamente de `Last viewed by client`; cuando no existe ese dato, el componente puntua frio (`0`) y no usa `postedAt`.
+- Se actualizaron defaults de `activity thresholds` a `fresh=1` y `recent=3` (runtime evaluator + defaults de settings).
+- Se reforzo parsing de `Proposals` para formatos reales de Upwork (`Less than 5`, `5 to 10`, `10 to 15`, `15 to 20`, `20 to 50`, `50+`, `5-10`, separadores degradados).
+- Regla de mapeo aplicada para evitar solape de fronteras: `5-10 => 5`; `10-15 => 11`; `15-20 => 16`; `20-50 => 21`.
+- Validaciones ejecutadas:
+  - parser de proposals validado por casos en Node (incluyendo `10–15` y `10?15`).
+  - smoke de score `spend` con umbrales custom (`A=600`, `B=200`, `C=100`) y distintos `totalSpent`.
+  - smoke de score `activity` variando solo `lastViewed`.
+  - `npm.cmd run test-content -- test/upwork-job-detail.html` OK.
+- Guardrails: `npm.cmd run check-sniper-guardrails` mantiene issue preexistente no ligado a este fix (`Support Avg/hr badge config missing`) y warnings de line-count en archivos grandes ya existentes.

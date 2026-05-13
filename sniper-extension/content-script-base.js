@@ -380,7 +380,7 @@
         hireRate: { weight: 30, thresholds: { A: 90, B: 70, C: 50 } },
         spend: { weight: 25, thresholds: { A: 1000, B: 500, C: 200 } },
         rating: { weight: 15, thresholds: { A: 4.8, min: 4.0 } },
-        activity: { weight: 10, thresholds: { fresh: 12, recent: 24 } },
+        activity: { weight: 10, thresholds: { fresh: 1, recent: 3 } },
         proposals: { weight: 10, thresholds: { A: 5, B: 10, C: 15 } },
         payment: { weight: 5, thresholds: {} },
         jobs: { weight: 5, thresholds: { A: 10, B: 1 } },

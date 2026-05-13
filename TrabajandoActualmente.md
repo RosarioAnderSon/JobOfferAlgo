@@ -169,3 +169,17 @@
 - Se corrigio tambien el uso de `killSwitches` en la rama de `New client` tomando el valor desde preflight en lugar de una variable local removida.
 - En `sniper-core-preflight.js` se expuso `killSwitches` incluso cuando `killResult` es `null`, para evitar referencias implicitas futuras.
 - Verificacion estatica: no quedan referencias a `lastViewedDate` fuera de preflight y no quedan usos huÃ©rfanos de `killSwitches` en evaluator.
+
+## 2026-05-13 - Fix scoring de Gasto/Actividad/Proposals
+- `Gasto total` ahora se calcula por `totalSpent` directo en el score base (antes usaba promedio por hire).
+- `Actividad` ahora depende solo de `Last viewed by client`; si falta ese dato, puntua frio (`0`) y ya no usa `postedAt` para ese componente.
+- Se ajustaron defaults de thresholds de `activity` a horas reales de `lastViewed`: `fresh=1`, `recent=3` (runtime + settings defaults).
+- Se rehizo el parser de `Proposals` para variantes de Upwork: `Less than 5`, rangos (`to`, `-`, separadores no estandar), y `50+`.
+- Regla de rangos aplicada: `5-10 => 5`; rangos mayores `a-b => a+1` (ej.: `10-15 => 11`, `15-20 => 16`, `20-50 => 21`).
+- Endurecimiento de parser ante artefactos de encoding: fallback por dos numeros cuando el separador viene degradado (ej. `10?15`).
+- Validacion ejecutada:
+  - casos de parser en Node para `Less than 5`, `5 to 10`, `10 to 15`, `15 to 20`, `20 to 50`, `50+`, `5-10`, `10–15`, `10?15`.
+  - smoke de evaluador con thresholds custom (`A=600`, `B=200`, `C=100`) confirmando `spendScore`: `50->20`, `100->75`, `200->90`, `600->100`.
+  - smoke de actividad solo por `lastViewed` confirmando progresion: `0.5h->100`, `2h->80`, `10h->70`, `30h->60`, `60h->0`.
+  - `npm run test-content -- test/upwork-job-detail.html` OK.
+  - `npm run check-sniper-guardrails` mantiene fallo preexistente: `Support Avg/hr badge config missing` (sin relacion con este fix).

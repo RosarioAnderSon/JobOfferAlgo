@@ -102,27 +102,55 @@
       return null;
     },
     extractProposals(text) {
-      const match = text.match(/Proposals:.*?(\d+\s*to\s*\d+|less than \d+|\d+)/is);
+      const source = String(text || '');
+      if (!source) return 20;
+
+      // Upwork variants: "Less than 5", "5 to 10", "10-15", "10–15", "50+"
+      const match = source.match(
+        /Proposals:\s*(less than\s+\d+|\d+\s*(?:to|[^\d\s]+)\s*\d+|\d+\s*\+|\d+)/i
+      );
       if (!match) return 20;
 
-      const pText = match[1].toLowerCase();
-      if (pText.includes('less than')) {
-        const num = parseInt(pText.match(/\d+/)?.[0] || '0', 10);
+      const raw = String(match[1] || '').trim().toLowerCase();
+      if (!raw) return 20;
+
+      if (raw.includes('less than')) {
+        const num = parseInt(raw.match(/\d+/)?.[0] || '0', 10);
         return Math.max(num - 1, 0);
       }
-      if (pText.includes('to')) {
-        const nums = pText.match(/\d+/g);
-        if (nums && nums.length >= 2) {
-          return (parseInt(nums[0], 10) + parseInt(nums[1], 10)) / 2;
-        }
+
+      if (raw.includes('+')) {
+        const num = parseInt(raw.match(/\d+/)?.[0] || '0', 10);
+        return Number.isFinite(num) ? num : 20;
       }
-      return parseInt(pText.match(/\d+/)?.[0] || '0', 10);
+
+      const range = raw.match(/(\d+)\s*(?:to|[^\d\s]+)\s*(\d+)/i);
+      if (range) {
+        const lower = parseInt(range[1], 10);
+        const upper = parseInt(range[2], 10);
+        if (!Number.isFinite(lower) || !Number.isFinite(upper)) return 20;
+        if (lower === 5 && upper === 10) return 5;
+        return lower + 1;
+      }
+
+      // Fallback for odd separators caused by encoding/rendering artifacts.
+      const numbers = raw.match(/\d+/g);
+      if (numbers && numbers.length >= 2) {
+        const lower = parseInt(numbers[0], 10);
+        const upper = parseInt(numbers[1], 10);
+        if (!Number.isFinite(lower) || !Number.isFinite(upper)) return 20;
+        if (lower === 5 && upper === 10) return 5;
+        return lower + 1;
+      }
+
+      const single = parseInt(raw.match(/\d+/)?.[0] || '0', 10);
+      return Number.isFinite(single) ? single : 20;
     },
     extractLastViewed(text) {
       const match = text.match(/Last viewed by client:.*?(\d+)\s*(minute|hour|day)s?\s*ago/is);
-      if (!match) return new Date();
+      if (!match) return null;
       const value = parseInt(match[1], 10);
-      return parseRelativeDate(value, match[2]) || new Date();
+      return parseRelativeDate(value, match[2]) || null;
     },
     extractInvites(text) {
       const match = text.match(/Invites sent:.*?(\d+)/is);
