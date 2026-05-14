@@ -53,7 +53,10 @@
     overlays.forEach((overlay) => {
       const jobId = overlay.getAttribute('data-job-id');
       if (!jobId) return;
-      const entry = cache[jobId];
+      const entry =
+        typeof this.resolveCachedEntryForJobId === 'function'
+          ? this.resolveCachedEntryForJobId(jobId, cache)?.entry
+          : cache[jobId];
       if (entry && entry.rawData && typeof window.SniperCoreEvaluate === 'function') {
         const result = window.SniperCoreEvaluate(entry.rawData, newWeights);
         if (typeof this.setCachedResult === 'function') {

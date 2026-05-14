@@ -1,5 +1,23 @@
 # TrabajandoActualmente
 
+## 2026-05-13 - Persistencia de overlays JobCard tras reload
+- Causa raiz corregida: la reconstruccion de overlays desde cache dependia de cache[jobId] literal, por lo que al recargar se perdian overlays cuando Upwork exponia variantes del mismo ID.
+- Se separo storage/cache en sniper-extension/content-script-methods-cache-storage.js para mantener content-script-methods-cache.js bajo 300 lineas.
+- La cache ahora:
+  - guarda nuevas entradas con key canonica (getCacheKeyForJobId).
+  - resuelve lecturas por variantes comparables (resolveCachedEntryForJobId).
+  - elimina aliases equivalentes al escribir una entrada nueva.
+  - retiene al menos los ultimos 20 resultados aunque superen cacheMaxAgeMs.
+- Se ajusto updateAllScoresInPlace para consultar cache por variantes y no por key literal.
+- manifest.json carga content-script-methods-cache-storage.js antes de content-script-methods-cache.js; se preservo la version local 1.0.5.
+- Validacion:
+  - node --check OK en content-script-methods-cache-storage.js, content-script-methods-cache.js, content-script-methods-overlay-refresh.js.
+  - manifest.json parsea OK con JSON.parse.
+  - Smoke inline OK: variante 02... -> canonica y retencion de 20 entradas vencidas.
+  - npm.cmd run check-sniper-lines mantiene warnings solo en content-script-base.js (478) y content-script-methods-flow-route.js (440); cache queda en 250 lineas y cache-storage en 174.
+  - npm.cmd run check-sniper-guardrails falla por issue preexistente: Support Avg/hr badge config missing.
+  - npm.cmd run check-sniper-ui-parity falla por baseline preexistente: HEAD:sniper-extension/content-script.js ya es launcher modular sin metodos de clase.
+  - npm.cmd run check-sniper-encoding OK.
 ## 2026-05-13 - Trazabilidad completa + retencion de overlays por variantes de ID
 - Causa raiz confirmada: en cleanup/cache habia comparaciones rigidas de `jobId` por igualdad literal, lo que removia overlays validos cuando Upwork representaba el mismo job con formatos distintos (`022...` vs `205...`).
 - Trazabilidad aplicada:
