@@ -53,109 +53,58 @@
     }
   };
 
+  UpworkSniperExtension.prototype.findOverlayForJob = function(card, targetJobId) {
+    if (!card || !targetJobId) return null;
+    return Array.from(card.querySelectorAll('.sniper-overlay[data-job-id]')).find((overlay) =>
+      sameJobId(this, overlay.getAttribute('data-job-id'), targetJobId)
+    ) || null;
+  };
+
+  UpworkSniperExtension.prototype.removeOverlaysForJob = function(card, targetJobId, reason = 'remove-job-ui') {
+    if (!card || !targetJobId) return 0;
+    let removed = 0;
+    Array.from(card.querySelectorAll('.sniper-overlay, .sniper-left-panel')).forEach((el) => {
+      const rawJobId = el.getAttribute('data-job-id');
+      if (rawJobId && !sameJobId(this, rawJobId, targetJobId)) return;
+      emitFlow(this, 'overlay-removed', buildOverlayDecisionPayload(this, rawJobId, targetJobId, reason));
+      el.remove();
+      removed += 1;
+    });
+    this.markCardJobId(card, targetJobId);
+    return removed;
+  };
+
   UpworkSniperExtension.prototype.cleanupOverlays = function(card, targetJobId = null) {
     if (!card) return;
-
-    const overlays = Array.from(card.querySelectorAll('.sniper-overlay'));
-    let keptOverlayForTarget = false;
-    overlays.forEach((overlay) => {
-      const overlayJobId = overlay.getAttribute('data-job-id');
-      const isLegacy = !overlayJobId;
-      // En limpieza dirigida por card: mantener solo 1 overlay del targetJobId.
-      if (targetJobId) {
-        if (isLegacy || !sameJobId(this, overlayJobId, targetJobId)) {
-          emitFlow(
-            this,
-            'overlay-removed',
-            buildOverlayDecisionPayload(
-              this,
-              overlayJobId,
-              targetJobId,
-              isLegacy ? 'cleanup-target-legacy-overlay' : 'cleanup-target-jobid-mismatch'
-            )
-          );
-          overlay.remove();
+    const clean = (selector, type) => {
+      let kept = false;
+      Array.from(card.querySelectorAll(selector)).forEach((el) => {
+        const rawJobId = el.getAttribute('data-job-id');
+        const isLegacy = !rawJobId;
+        if (!targetJobId) {
+          if (!isLegacy) return;
+          emitFlow(this, 'overlay-removed', buildOverlayDecisionPayload(this, rawJobId, null, `cleanup-general-legacy-${type}`));
+          el.remove();
           return;
         }
-        if (keptOverlayForTarget) {
-          emitFlow(
-            this,
-            'overlay-removed',
-            buildOverlayDecisionPayload(this, overlayJobId, targetJobId, 'cleanup-target-duplicate-overlay')
-          );
-          overlay.remove();
+        if (isLegacy || !sameJobId(this, rawJobId, targetJobId)) {
+          const mismatch = type === 'panel' ? 'cleanup-target-panel-jobid-mismatch' : 'cleanup-target-jobid-mismatch';
+          const reason = isLegacy ? `cleanup-target-legacy-${type}` : mismatch;
+          emitFlow(this, 'overlay-removed', buildOverlayDecisionPayload(this, rawJobId, targetJobId, reason));
+          el.remove();
           return;
         }
-        keptOverlayForTarget = true;
-        emitFlow(
-          this,
-          'overlay-retained-check',
-          buildOverlayDecisionPayload(this, overlayJobId, targetJobId, 'cleanup-target-keep-overlay')
-        );
-        return;
-      }
-
-      // Limpieza general (sin target): solo legacy.
-      if (isLegacy) {
-        emitFlow(
-          this,
-          'overlay-removed',
-          buildOverlayDecisionPayload(this, overlayJobId, null, 'cleanup-general-legacy-overlay')
-        );
-        overlay.remove();
-      }
-    });
-
-    const panels = Array.from(card.querySelectorAll('.sniper-left-panel'));
-    let keptPanelForTarget = false;
-    panels.forEach((panel) => {
-      const panelJobId = panel.getAttribute('data-job-id');
-      const isLegacy = !panelJobId;
-      // En limpieza dirigida por card: mantener solo 1 panel del targetJobId.
-      if (targetJobId) {
-        if (isLegacy || !sameJobId(this, panelJobId, targetJobId)) {
-          emitFlow(
-            this,
-            'overlay-removed',
-            buildOverlayDecisionPayload(
-              this,
-              panelJobId,
-              targetJobId,
-              isLegacy ? 'cleanup-target-legacy-panel' : 'cleanup-target-panel-jobid-mismatch'
-            )
-          );
-          panel.remove();
+        if (kept) {
+          emitFlow(this, 'overlay-removed', buildOverlayDecisionPayload(this, rawJobId, targetJobId, `cleanup-target-duplicate-${type}`));
+          el.remove();
           return;
         }
-        if (keptPanelForTarget) {
-          emitFlow(
-            this,
-            'overlay-removed',
-            buildOverlayDecisionPayload(this, panelJobId, targetJobId, 'cleanup-target-duplicate-panel')
-          );
-          panel.remove();
-          return;
-        }
-        keptPanelForTarget = true;
-        emitFlow(
-          this,
-          'overlay-retained-check',
-          buildOverlayDecisionPayload(this, panelJobId, targetJobId, 'cleanup-target-keep-panel')
-        );
-        return;
-      }
-
-      // Limpieza general (sin target): solo legacy.
-      if (isLegacy) {
-        emitFlow(
-          this,
-          'overlay-removed',
-          buildOverlayDecisionPayload(this, panelJobId, null, 'cleanup-general-legacy-panel')
-        );
-        panel.remove();
-      }
-    });
-
+        kept = true;
+        emitFlow(this, 'overlay-retained-check', buildOverlayDecisionPayload(this, rawJobId, targetJobId, `cleanup-target-keep-${type}`));
+      });
+    };
+    clean('.sniper-overlay', 'overlay');
+    clean('.sniper-left-panel', 'panel');
     if (targetJobId) this.markCardJobId(card, targetJobId);
   };
 

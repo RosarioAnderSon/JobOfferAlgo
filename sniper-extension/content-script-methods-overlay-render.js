@@ -130,10 +130,8 @@
     overlay.appendChild(settingsEl);
 
     targetCard.style.position = 'relative';
-    // Clean any existing overlay from the resolved target too
-    if (targetCard !== card && jobId) {
-      const existingInTarget = targetCard.querySelector(`.sniper-overlay[data-job-id="${jobId}"]`);
-      if (existingInTarget) existingInTarget.remove();
+    if (jobId && typeof this.removeOverlaysForJob === 'function') {
+      this.removeOverlaysForJob(targetCard, jobId, 'inject-overlay-replace');
     }
     targetCard.appendChild(overlay);
     this.renderGlobalMissingSkillsSidebar();

@@ -161,3 +161,12 @@
   - smoke de score `activity` variando solo `lastViewed`.
   - `npm.cmd run test-content -- test/upwork-job-detail.html` OK.
 - Guardrails: `npm.cmd run check-sniper-guardrails` mantiene issue preexistente no ligado a este fix (`Support Avg/hr badge config missing`) y warnings de line-count en archivos grandes ya existentes.
+
+## 2026-05-14
+### Sniper Extension - Refactor flow + overlays idempotentes + Last viewed yesterday
+- Se partio `content-script-methods-flow-route.js` en route/extract/render para retirar el archivo grande del flujo principal sin cambiar contratos publicos.
+- Se corrigio la reinyeccion duplicada de overlays al reabrir el mismo card usando limpieza por `isSameJobId(...)` en render, inject y cache/feed.
+- `findJobCardById` ahora compara IDs equivalentes en el ID resuelto de la card y en links, evitando misses por variantes canonicas.
+- `Last viewed by client: yesterday` ahora se parsea como 24h atras en runtime y scripts de prueba; deja de mostrarse como ausencia de last viewed.
+- Validacion: `node --check` OK, `npm.cmd run check-sniper-guardrails` OK, `npm.cmd run test-content` OK, `npm.cmd run test-html` OK y smoke runtime `yesterday -> hours=24`.
+- Pendiente tecnico conocido: `sniper-extension/content-script-base.js` sigue sobre 300 lineas y queda fuera de este fix por alcance.

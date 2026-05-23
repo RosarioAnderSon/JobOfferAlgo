@@ -3,7 +3,7 @@
 Documentación oficial del algoritmo de scoring para filtrar trabajos de Upwork. Incluye insumos requeridos, kill switches, puntajes base (con lógica de densidad), penalizaciones tácticas (ahora todas restan **-1** o **-0.5**) y bonuses (todas suman **+1**) más badges clasificados.
 
 **v4.8 Changelog:**
-- **Ghost job contextual:** Ahora solo es KillSwitch si `lastViewed > 2 días` Y `interviewing === 0`. Si hay entrevistas activas, es "Shortlisting" (penalidad suave).
+- **Ghost job contextual:** Ahora solo es KillSwitch si `lastViewed` esta presente, `lastViewed > 2 dias` Y `interviewing === 0`. Si hay entrevistas activas, es "Shortlisting" (penalidad suave).
 - **Nuevo badge Shortlisting:** Cliente pausó la búsqueda pero tiene candidatos en proceso.
 - **Nuevo badge Stagnant job:** Detecta estancamiento real comparando métricas históricas (7+ días sin cambios).
 - **Tracking histórico:** Cache almacena métricas por visita para detectar tendencias.
@@ -12,7 +12,7 @@ Documentación oficial del algoritmo de scoring para filtrar trabajos de Upwork.
 
 Los siguientes datos deben extraerse del contexto del trabajo (Sidebar/Job Detail):
 
-*   **Dates:** `memberSince`, `postedAt`, `lastViewed`, `now` (default: current time).
+*   **Dates:** `memberSince`, `postedAt`, `lastViewed` (optional), `now` (default: current time).
 *   **Client Stats:** `jobsPosted`, `paymentVerified`, `totalSpent` (USD), `totalHires`, `avgHourlyPaid` (USD/hr), `clientCountry`.
 *   **Explicit Stats:** `hireRatePct` (Extracto literal "XX% hire rate", prioridad sobre cálculo manual).
 *   **Rating:** `rating` (0.0–5.0), `reviewsCount`.
@@ -26,7 +26,7 @@ Los siguientes datos deben extraerse del contexto del trabajo (Sidebar/Job Detai
 Si alguna condición es `TRUE`, el `FinalScore` se fuerza a **0 (F)** inmediatamente.
 
 1.  **Newbie Risk:** `memberSince < 5 months` **AND** (`paymentVerified == false` OR `jobsPosted == 0`).
-2.  **Ghost Job:** `lastViewed > 48 hours` (2 días) **Y** `interviewing === 0`. *Nota: Si hay entrevistas activas (interviewing > 0), el cliente probablemente está en shortlisting, no abandonó el post.*
+2.  **Ghost Job:** `lastViewed` presente y `lastViewed > 48 hours` (2 dias) **Y** `interviewing === 0`. *Nota: Si falta `lastViewed`, no se dispara este kill switch.*
 3.  **Unverified & Broke:** `paymentVerified == false` **AND** `totalSpent == 0`.
 
 ***
@@ -67,11 +67,12 @@ Cálculo de componentes normalizados (0-100) ponderados.
 
 ### D. Activity (10%) - "Intensidad" (interacción + frescura)
 
-*   **A:** Post < 12h **y** interacción (view del cliente o interviewing) → 100 pts.
-*   **B:** Post < 12h **sin** interacción → 85 pts.
-*   **B:** Post < 24h (con o sin interacción; si hay interacción se mantiene B) → 85 pts.
-*   **B:** Post ≥ 24h **con** interacción → 85 pts.
-*   **F:** Post ≥ 24h **sin** interacción → 0 pts.
+*   `lastViewed < 1h` -> 100 pts.
+*   `lastViewed < 3h` -> 80 pts.
+*   `lastViewed < 24h` -> 70 pts.
+*   `lastViewed < 48h` -> 60 pts.
+*   Si falta `lastViewed` pero `postedAt < 3h`, usar 60 pts para no castigar posts frescos sin ese campo visible.
+*   Si falta `lastViewed` y `postedAt >= 3h` o tambien falta `postedAt`, usar 0 pts.
 
 ### E. Proposals (10%) - "Competencia"
 
@@ -114,7 +115,7 @@ Todas restan **-1** al `BaseScore`:
 12. **Perpetual Posting:** `postedAt > 7 days`.
 13. **Time Waster:** `interviewing / proposals > 40%` **AND** `35% <= hireRate < 50%`.
 14. **Data Harvesting:** `hires <= 1` **AND** `interviewing / proposals > 35%` **AND** `hireRate < 25%` **AND** `memberSince < 6 months`.
-15. **Paused/Shortlisting:** (-0.5) `lastViewed > 2 días` **AND** `interviewing > 0`. *Cliente está en proceso de selección pero pausó la búsqueda.*
+15. **Paused/Shortlisting:** (-0.5) `lastViewed` presente, `lastViewed > 2 dias` **AND** `interviewing > 0`. *Cliente está en proceso de selección pero pausó la búsqueda.*
 16. **Stagnant job:** (-1) Métricas (proposals, interviewing, invites) sin cambios durante 7+ días **AND** `interviewing === 0`. *Requiere historial de visitas.*
 
 ***

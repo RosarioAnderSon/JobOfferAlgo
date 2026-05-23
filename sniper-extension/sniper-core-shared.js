@@ -25,6 +25,7 @@
     if (!(date instanceof Date) || Number.isNaN(date.getTime())) return Infinity;
     return (now.getTime() - date.getTime()) / MS_PER_HOUR;
   };
+  const isValidDate = (date) => date instanceof Date && !Number.isNaN(date.getTime());
 
   const hireRatePoints = (jobsPosted, totalHires, overridePct, thresholds = { A: 90, B: 70, C: 50 }) => {
     if (jobsPosted === 0) return 85;
@@ -58,17 +59,19 @@
   };
 
   const activityPoints = (input, now, thresholds = { fresh: 1, recent: 3 }) => {
-    const lastViewed =
-      input.lastViewed instanceof Date && !Number.isNaN(input.lastViewed.getTime())
-        ? input.lastViewed
-        : null;
-    if (!lastViewed) return 0;
+    const lastViewed = isValidDate(input?.lastViewed) ? input.lastViewed : null;
+    if (lastViewed) {
+      const viewedHours = hoursSince(lastViewed, now);
+      if (viewedHours < thresholds.fresh) return 100;
+      if (viewedHours < thresholds.recent) return 80;
+      if (viewedHours < 24) return 70;
+      if (viewedHours < 48) return 60;
+      return 0;
+    }
 
-    const viewedHours = hoursSince(lastViewed, now);
-    if (viewedHours < thresholds.fresh) return 100;
-    if (viewedHours < thresholds.recent) return 80;
-    if (viewedHours < 24) return 70;
-    if (viewedHours < 48) return 60;
+    const postedAt = isValidDate(input?.postedAt) ? input.postedAt : null;
+    const postedHours = postedAt ? hoursSince(postedAt, now) : Infinity;
+    if (postedHours >= 0 && postedHours < thresholds.recent) return 60;
     return 0;
   };
 
@@ -107,6 +110,7 @@
     monthsBetween,
     daysSince,
     hoursSince,
+    isValidDate,
     hireRatePoints,
     spendPoints,
     ratingPoints,

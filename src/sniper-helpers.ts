@@ -1,5 +1,10 @@
 import type { Grade } from './sniper-types';
 
+interface ActivityInput {
+  lastViewed?: Date | null;
+  postedAt?: Date | null;
+}
+
 export const MS_PER_DAY = 86_400_000;
 export const MS_PER_HOUR = 3_600_000;
 export const LOW_REVIEW_TOXIC_THRESHOLD = 2;
@@ -17,11 +22,18 @@ export const monthsBetween = (from: Date, to: Date) => {
   return days < 0 ? total - 1 : total;
 };
 
-export const daysSince = (date: Date, now: Date) =>
-  (now.getTime() - date.getTime()) / MS_PER_DAY;
+export const isValidDate = (date: unknown): date is Date =>
+  date instanceof Date && !Number.isNaN(date.getTime());
 
-export const hoursSince = (date: Date, now: Date) =>
-  (now.getTime() - date.getTime()) / MS_PER_HOUR;
+export const daysSince = (date: Date | null | undefined, now: Date) =>
+  isValidDate(date)
+    ? (now.getTime() - date.getTime()) / MS_PER_DAY
+    : Infinity;
+
+export const hoursSince = (date: Date | null | undefined, now: Date) =>
+  isValidDate(date)
+    ? (now.getTime() - date.getTime()) / MS_PER_HOUR
+    : Infinity;
 
 export const hireRatePoints = (
   jobsPosted: number,
@@ -65,13 +77,19 @@ export const ratingPoints = (rating: number, reviewsCount: number) => {
   return 70;
 };
 
-export const activityPoints = (lastViewed: Date, now: Date) => {
-  if (!(lastViewed instanceof Date) || Number.isNaN(lastViewed.getTime())) return 0;
-  const hours = hoursSince(lastViewed, now);
-  if (hours < 1) return 100;
-  if (hours < 3) return 80;
-  if (hours < 24) return 70;
-  if (hours < 48) return 60;
+export const activityPoints = (input: ActivityInput, now: Date) => {
+  const lastViewed = isValidDate(input.lastViewed) ? input.lastViewed : null;
+  if (lastViewed) {
+    const hours = hoursSince(lastViewed, now);
+    if (hours < 1) return 100;
+    if (hours < 3) return 80;
+    if (hours < 24) return 70;
+    if (hours < 48) return 60;
+    return 0;
+  }
+
+  const postedHours = hoursSince(input.postedAt, now);
+  if (postedHours >= 0 && postedHours < 3) return 60;
   return 0;
 };
 

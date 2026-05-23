@@ -1,4 +1,3 @@
-const { execSync } = require('child_process');
 const fs = require('fs');
 const path = require('path');
 const acorn = require('acorn');
@@ -6,7 +5,15 @@ const acorn = require('acorn');
 const root = process.cwd();
 const extDir = path.join(root, 'sniper-extension');
 
-const parse = (code) => acorn.parse(code, { ecmaVersion: 'latest', sourceType: 'script' });
+const read = (name) => fs.readFileSync(path.join(extDir, name), 'utf8');
+const parse = (code, file) => {
+  try {
+    return acorn.parse(code, { ecmaVersion: 'latest', sourceType: 'script' });
+  } catch (error) {
+    error.message = `${file}: ${error.message}`;
+    throw error;
+  }
+};
 
 const walk = (node, fn) => {
   fn(node);
@@ -18,120 +25,142 @@ const walk = (node, fn) => {
   }
 };
 
-const stripMeta = (node) => {
-  if (node == null || typeof node !== 'object') return node;
-  if (Array.isArray(node)) return node.map(stripMeta);
-  const out = {};
-  for (const [k, v] of Object.entries(node)) {
-    if (k === 'start' || k === 'end' || k === 'loc' || k === 'range') continue;
-    out[k] = stripMeta(v);
-  }
-  return out;
-};
-
-const classMethods = (code) => {
-  const map = new Map();
-  const ast = parse(code);
-  walk(ast, (n) => {
-    if (n.type === 'ClassDeclaration' && n.id && n.id.name === 'UpworkSniperExtension') {
-      for (const el of n.body.body) {
-        if (el.type === 'MethodDefinition' && el.key && el.key.type === 'Identifier') {
-          map.set(el.key.name, el.value);
-        }
-      }
-    }
-  });
-  return map;
-};
-
-const protoMethods = (codes) => {
-  const map = new Map();
-  for (const code of codes) {
-    const ast = parse(code);
+const collectMethods = (files) => {
+  const methods = new Map();
+  for (const file of files) {
+    const code = read(file);
+    const ast = parse(code, file);
     walk(ast, (n) => {
       if (
         n.type === 'AssignmentExpression' &&
         n.operator === '=' &&
-        n.left &&
-        n.left.type === 'MemberExpression'
+        n.left?.type === 'MemberExpression'
       ) {
-        const l = n.left;
+        const left = n.left;
         if (
-          l.object &&
-          l.object.type === 'MemberExpression' &&
-          l.object.object &&
-          l.object.object.type === 'Identifier' &&
-          l.object.object.name === 'UpworkSniperExtension' &&
-          l.object.property &&
-          l.object.property.type === 'Identifier' &&
-          l.object.property.name === 'prototype' &&
-          l.property &&
-          l.property.type === 'Identifier' &&
+          left.object?.type === 'MemberExpression' &&
+          left.object.object?.name === 'UpworkSniperExtension' &&
+          left.object.property?.name === 'prototype' &&
+          left.property?.type === 'Identifier' &&
           (n.right.type === 'FunctionExpression' || n.right.type === 'ArrowFunctionExpression')
         ) {
-          map.set(l.property.name, n.right);
+          methods.set(left.property.name, file);
         }
       }
-      if (n.type === 'ClassDeclaration' && n.id && n.id.name === 'UpworkSniperExtension') {
+      if (n.type === 'ClassDeclaration' && n.id?.name === 'UpworkSniperExtension') {
         for (const el of n.body.body) {
-          if (el.type === 'MethodDefinition' && el.key && el.key.type === 'Identifier') {
-            map.set(el.key.name, el.value);
+          if (el.type === 'MethodDefinition' && el.key?.type === 'Identifier') {
+            methods.set(el.key.name, file);
           }
         }
       }
     });
   }
-  return map;
+  return methods;
 };
 
-const baseline = execSync('git show HEAD:sniper-extension/content-script.js', { encoding: 'utf8' });
-const baselineMethods = classMethods(baseline);
+const manifest = JSON.parse(read('manifest.json'));
+const contentScripts = Array.isArray(manifest.content_scripts) ? manifest.content_scripts : [];
+const jsFiles = contentScripts.flatMap((entry) => (Array.isArray(entry.js) ? entry.js : []));
+const failures = [];
 
-const moduleFiles = fs
-  .readdirSync(extDir)
-  .filter((f) => f.startsWith('content-script') && f.endsWith('.js'))
-  .sort();
+const requireFile = (file) => {
+  if (!jsFiles.includes(file)) failures.push(`Manifest missing JS module: ${file}`);
+};
+const requireOrder = (before, after) => {
+  const beforeIndex = jsFiles.indexOf(before);
+  const afterIndex = jsFiles.indexOf(after);
+  if (beforeIndex === -1 || afterIndex === -1) return;
+  if (beforeIndex >= afterIndex) failures.push(`Manifest JS order invalid: ${before} must load before ${after}`);
+};
 
-const moduleCodes = moduleFiles.map((f) => fs.readFileSync(path.join(extDir, f), 'utf8'));
-const currentMethods = protoMethods(moduleCodes);
+[
+  'sniper-core-shared.js',
+  'sniper-core-preflight.js',
+  'sniper-core-evaluate.js',
+  'sniper-core.js',
+  'extractors.js',
+  'content-script-base.js',
+  'content-script-methods-flow-overlay.js',
+  'content-script-methods-flow-route.js',
+  'content-script-methods-flow-extract.js',
+  'content-script-methods-flow-render.js',
+  'content-script-badge-definitions.js',
+  'content-script-methods-ui-badges.js',
+  'content-script-methods-ui-score.js',
+  'content-script.js',
+].forEach(requireFile);
 
-const methodsToCompare = [
+if (new Set(jsFiles).size !== jsFiles.length) failures.push('Manifest contains duplicate JS modules');
+if (jsFiles[jsFiles.length - 1] !== 'content-script.js') {
+  failures.push('content-script.js must remain the final launcher module');
+}
+
+requireOrder('sniper-core-shared.js', 'sniper-core-evaluate.js');
+requireOrder('sniper-core-preflight.js', 'sniper-core-evaluate.js');
+requireOrder('sniper-core-evaluate.js', 'sniper-core.js');
+requireOrder('extractors.js', 'content-script-methods-flow-route.js');
+requireOrder('extractors.js', 'content-script-methods-flow-extract.js');
+requireOrder('content-script-base.js', 'content-script-methods-flow-route.js');
+requireOrder('content-script-base.js', 'content-script-methods-flow-extract.js');
+requireOrder('content-script-base.js', 'content-script-methods-flow-render.js');
+requireOrder('content-script-base.js', 'content-script-methods-ui-score.js');
+requireOrder('content-script-badge-definitions.js', 'content-script-methods-ui-badges.js');
+requireOrder('content-script-methods-flow-overlay.js', 'content-script-methods-flow-route.js');
+requireOrder('content-script-methods-flow-route.js', 'content-script-methods-flow-extract.js');
+requireOrder('content-script-methods-flow-extract.js', 'content-script-methods-flow-render.js');
+requireOrder('content-script-methods-flow-route.js', 'content-script.js');
+requireOrder('content-script-methods-flow-extract.js', 'content-script.js');
+requireOrder('content-script-methods-flow-render.js', 'content-script.js');
+
+for (const file of jsFiles) {
+  parse(read(file), file);
+}
+
+const methods = collectMethods(jsFiles.filter((file) => file.startsWith('content-script')));
+const requiredMethods = [
   'waitForJobContent',
   'processJobDetail',
   'extractJobData',
   'evaluateAndRender',
   'renderUI',
+  'findJobCardById',
   'createScoreBadge',
   'createScoreTooltip',
   'buildComponentBreakdown',
   'createBadge',
   'getBadgeConfig',
   'createSettingsButton',
-  'createMissingSkillsPanel',
   'injectOverlay',
+  'applyCachedOverlaysToFeed',
+  'getFeedJobLinks',
+  'getCardJobId',
+  'findOverlayForJob',
+  'removeOverlaysForJob',
+  'removeOrphanOverlays',
+  'cleanupOverlays',
+  'refreshOverlaysFromCache',
+  'computeSupportAvgBadge',
+  'computeSkillsMatch',
+  'captureFreelancerProfileSkills',
+  'renderGlobalMissingSkillsSidebar',
 ];
 
-const mismatches = [];
-for (const name of methodsToCompare) {
-  const a = baselineMethods.get(name);
-  const b = currentMethods.get(name);
-  if (!a || !b) {
-    mismatches.push({ name, reason: 'missing method in baseline or current modules' });
-    continue;
-  }
-  const sa = JSON.stringify(stripMeta(a));
-  const sb = JSON.stringify(stripMeta(b));
-  if (sa !== sb) {
-    mismatches.push({ name, reason: 'AST differs from baseline' });
-  }
+for (const method of requiredMethods) {
+  if (!methods.has(method)) failures.push(`Missing UpworkSniperExtension method: ${method}`);
 }
 
-if (mismatches.length) {
+if (!read('content-script-methods-flow-overlay.js').includes('window.__sniperOverlayLoaded = true')) {
+  failures.push('Overlay runtime loaded marker missing');
+}
+if (!read('content-script.js').includes('new UpworkSniperExtension()')) {
+  failures.push('Launcher does not instantiate UpworkSniperExtension');
+}
+
+if (failures.length) {
   console.error('UI parity check failed:');
-  for (const m of mismatches) {
-    console.error('- ' + m.name + ': ' + m.reason);
-  }
+  for (const failure of failures) console.error('- ' + failure);
   process.exit(1);
 }
 
-console.log('UI parity check passed.');
+console.log(`UI parity check passed (${requiredMethods.length} methods, ${jsFiles.length} manifest modules).`);

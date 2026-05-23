@@ -11,8 +11,11 @@
   const BADGE_DIAG_KEY = 'sniper-diag-badges-v1';
   const ERROR_LOG_KEY = 'sniper-error-log-v1';
   const FLOW_LOG_KEY = 'sniper-flow-log-v1';
+  const PERSIST_LOGS_KEY = 'sniper-persist-logs-v1';
   const ERROR_LOG_MAX = 120;
   const FLOW_LOG_MAX = 300;
+  let memoryErrorLogBuffer = [];
+  let memoryFlowLogBuffer = [];
   const LEGACY_VERBOSE = localStorage.getItem('sniper-debug-verbose-v1') === '1';
   const LOG_LEVEL = (() => {
     const raw = String(localStorage.getItem(LOG_LEVEL_KEY) || '').trim().toLowerCase();
@@ -44,6 +47,9 @@
     };
   };
   const readErrorLogBuffer = () => {
+    if (localStorage.getItem(PERSIST_LOGS_KEY) !== '1') {
+      return memoryErrorLogBuffer.slice();
+    }
     try {
       const raw = localStorage.getItem(ERROR_LOG_KEY);
       if (!raw) return [];
@@ -54,6 +60,10 @@
     }
   };
   const writeErrorLogBuffer = (entries) => {
+    if (localStorage.getItem(PERSIST_LOGS_KEY) !== '1') {
+      memoryErrorLogBuffer = Array.isArray(entries) ? entries.slice() : [];
+      return;
+    }
     try {
       localStorage.setItem(ERROR_LOG_KEY, JSON.stringify(entries));
     } catch (_error) {
@@ -81,6 +91,9 @@
     return entry;
   };
   const readFlowLogBuffer = () => {
+    if (localStorage.getItem(PERSIST_LOGS_KEY) !== '1') {
+      return memoryFlowLogBuffer.slice();
+    }
     try {
       const raw = localStorage.getItem(FLOW_LOG_KEY);
       if (!raw) return [];
@@ -91,6 +104,10 @@
     }
   };
   const writeFlowLogBuffer = (entries) => {
+    if (localStorage.getItem(PERSIST_LOGS_KEY) !== '1') {
+      memoryFlowLogBuffer = Array.isArray(entries) ? entries.slice() : [];
+      return;
+    }
     try {
       localStorage.setItem(FLOW_LOG_KEY, JSON.stringify(entries));
     } catch (_error) {

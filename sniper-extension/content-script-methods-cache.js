@@ -191,15 +191,16 @@
           return;
         }
 
+        const outerCard = typeof this.resolveOuterCard === 'function' ? this.resolveOuterCard(card) : card;
+
         if (typeof this.flow === 'function') {
           const reason = stale ? 'stale' : cachedMatch?.key === jobId ? 'fresh' : 'fresh-variant';
           this.flow('cache-hit', { jobId, reason });
         }
         if (stale) {
-          const staleOverlay = card.querySelector(`.sniper-overlay[data-job-id="${jobId}"]`);
-          if (staleOverlay) staleOverlay.remove();
-          const stalePanel = card.querySelector(`.sniper-left-panel[data-job-id="${jobId}"]`);
-          if (stalePanel) stalePanel.remove();
+          if (typeof this.removeOverlaysForJob === 'function') {
+            this.removeOverlaysForJob(outerCard, jobId, 'cache-stale-job-ui');
+          }
           if (typeof this.diagBadge === 'function' && this.isBadgeDiagEnabled()) {
             const staleBadges = Array.isArray(cached.badges) ? cached.badges : [];
             this.diagBadge(`cache-read jobId=${jobId} stale=true badgeCount=${staleBadges.length}`, staleBadges);
@@ -207,8 +208,10 @@
           return;
         }
 
-        const outerCard = typeof this.resolveOuterCard === 'function' ? this.resolveOuterCard(card) : card;
-        const existingOverlayForCard = outerCard.querySelector('.sniper-overlay[data-job-id]');
+        const existingOverlayForCard =
+          typeof this.findOverlayForJob === 'function'
+            ? this.findOverlayForJob(outerCard, jobId)
+            : outerCard.querySelector('.sniper-overlay[data-job-id]');
         if (existingOverlayForCard) {
           const existingJobId = existingOverlayForCard.getAttribute('data-job-id');
           const isSameExistingJob =
@@ -216,6 +219,7 @@
               ? this.isSameJobId(existingJobId, jobId)
               : String(existingJobId || '').trim() === String(jobId || '').trim();
           if (isSameExistingJob) {
+            this.cleanupOverlays(outerCard, jobId);
             if (typeof this.flow === 'function') {
               this.flow('overlay-retained-check', {
                 rawOverlayJobId: existingJobId || null,
@@ -249,10 +253,14 @@
 
         this.cleanupOverlays(card, jobId);
         if (outerCard !== card) this.cleanupOverlays(outerCard, jobId);
-        const existingOverlay = outerCard.querySelector(`.sniper-overlay[data-job-id="${jobId}"]`);
+        const existingOverlay =
+          typeof this.findOverlayForJob === 'function'
+            ? this.findOverlayForJob(outerCard, jobId)
+            : outerCard.querySelector(`.sniper-overlay[data-job-id="${jobId}"]`);
         if (existingOverlay) return;
-        const legacyOverlay = outerCard.querySelector('.sniper-overlay:not([data-job-id])');
-        if (legacyOverlay) return;
+        if (typeof this.removeOverlaysForJob === 'function') {
+          this.removeOverlaysForJob(outerCard, jobId, 'cache-inject-cleanup');
+        }
 
         this.injectOverlay(card, cached, cachedEntry?.rawData || null, jobId);
         if (typeof this.flow === 'function') this.flow('inject-from-cache', { jobId, reason: 'feed-pass' });

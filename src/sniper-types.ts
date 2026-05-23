@@ -49,7 +49,7 @@ export interface JobInput {
   reviewsCount: number;
   proposalCount: number;
   descriptionText?: string;
-  lastViewed: Date;
+  lastViewed?: Date | null;
   invitesSent: number;
   /**
    * Pending invites (sent but not answered yet).
@@ -106,3 +106,4 @@ export interface EvaluationResult {
     penalties: number;
     bonuses: number;
   };
+}

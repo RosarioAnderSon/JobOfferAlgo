@@ -139,11 +139,13 @@ const parseUpworkHTML = (htmlPath: string): JobInput => {
 
   // Last Viewed
   const viewedMatch = activityText.match(/Last viewed by client:?\s*([^\n]+)/i);
-  let lastViewed = new Date();
+  let lastViewed: Date | undefined;
   if (viewedMatch) {
     const vText = viewedMatch[1].toLowerCase();
     const now = new Date();
-    if (vText.includes('minute')) {
+    if (vText.includes('yesterday')) {
+      lastViewed = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+    } else if (vText.includes('minute')) {
       const mins = parseInt(vText.match(/(\d+)/)?.[1] || '0');
       lastViewed = new Date(now.getTime() - mins * 60 * 1000);
     } else if (vText.includes('hour')) {
@@ -189,4 +191,3 @@ const result = evaluateSniper(input);
 
 console.log('Parsed input:', input);
 console.log('Evaluation:', result);
-

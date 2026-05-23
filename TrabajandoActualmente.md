@@ -1,5 +1,17 @@
 # TrabajandoActualmente
 
+## 2026-05-14 - Revision pre-deploy Cloudflare/Upwork + ajuste pendiente de actividad
+- Revision pre-deploy sin cambios de codigo:
+  - `manifest.json` no declara background/service worker, `tabs`, `scripting`, `webRequest`, `declarativeNetRequest`, `activeTab` ni permisos fuera de `https://www.upwork.com/*`.
+  - No se encontraron `fetch`, `XMLHttpRequest`, `WebSocket`, `sendBeacon`, auto-clicks, submits, reloads, scroll automation ni llamadas API desde `sniper-extension`.
+  - La extension trabaja con lectura del DOM, `localStorage`, observers, scheduler de overlays y mutaciones propias (`.sniper-*`) dentro de la pagina.
+  - Riesgo Cloudflare principal revisado: volumen de mutaciones DOM. El runtime actual conserva defensas anti-patron: backoff/jitter, pausa relativa en `document.hidden`, lock de pasada, dedupe y presupuesto de mutaciones por tick.
+- Hallazgos antes de desplegar:
+  - `npm.cmd run check-sniper-guardrails` falla por issue existente: `Support Avg/hr badge config missing`.
+  - Warning de archivos >300 lineas: `sniper-extension/content-script-base.js` y `sniper-extension/content-script-methods-flow-route.js`.
+- Nuevo requisito pendiente de aprobacion:
+  - Si `lastViewed` no existe pero `postedAt` indica publicacion con menos de 3 horas, `Activity` debe puntuar positivo para evitar castigar jobs recien publicados.
+  - Punto de cambio localizado: `sniper-extension/sniper-core-shared.js::activityPoints(...)`; mantener paridad con `src/sniper-helpers.ts` y documentacion de algoritmo si se aprueba.
 ## 2026-05-13 - Persistencia de overlays JobCard tras reload
 - Causa raiz corregida: la reconstruccion de overlays desde cache dependia de cache[jobId] literal, por lo que al recargar se perdian overlays cuando Upwork exponia variantes del mismo ID.
 - Se separo storage/cache en sniper-extension/content-script-methods-cache-storage.js para mantener content-script-methods-cache.js bajo 300 lineas.
@@ -201,3 +213,42 @@
   - smoke de actividad solo por `lastViewed` confirmando progresion: `0.5h->100`, `2h->80`, `10h->70`, `30h->60`, `60h->0`.
   - `npm run test-content -- test/upwork-job-detail.html` OK.
   - `npm run check-sniper-guardrails` mantiene fallo preexistente: `Support Avg/hr badge config missing` (sin relacion con este fix).
+
+## 2026-05-14 - lastViewed fallback + hardening extension
+- `Activity` vuelve a puntuar posts frescos cuando Upwork no expone `Last viewed`: si falta `lastViewed` y `postedAt < 3h`, usa 60 puntos; si `postedAt >= 3h` o falta, queda en 0.
+- `Ghost job` y `Shortlisting` requieren `lastViewed` valido; ausencia de ese campo ya no dispara kill switch ni badge.
+- Se quito `host_permissions` del manifest y se mantuvieron los `content_scripts.matches` actuales para no romper rutas SPA de Upwork.
+- Logs de error/flow quedan en memoria por defecto; solo se persisten en `localStorage` con opt-in `sniper-persist-logs-v1`.
+- Se actualizo paridad de guardrails a `Niche Avg/hr` y se reemplazo el check UI contra baseline obsoleto por validacion de modulos/metodos del manifest actual.
+- Documentacion actualizada en `PRIVACY_POLICY.md`, `BADGES.md` y `ALGORITHM.md`.
+- Validacion ejecutada: `node --check` en JS tocados, `npx.cmd tsc --noEmit`, `npm.cmd run check-sniper-guardrails`, smoke runtime JS y smoke TS de los 4 escenarios focales, busqueda estatica sin red/API/automatizacion prohibida.
+- Warnings pendientes: archivos >300 lineas siguen siendo `sniper-extension/content-script-base.js` y `sniper-extension/content-script-methods-flow-route.js`; no se partieron para evitar refactor fuera de scope.
+## 2026-05-14 - Refactor flujo + overlays idempotentes + Last viewed yesterday
+- Se dividio `content-script-methods-flow-route.js`:
+  - queda con watcher/orquestacion de job detail.
+  - `content-script-methods-flow-extract.js` concentra scope y extraccion.
+  - `content-script-methods-flow-render.js` concentra evaluacion, render y busqueda de card.
+- Se corrigio la causa de overlays superpuestos al reabrir el mismo card:
+  - `findOverlayForJob(...)` y `removeOverlaysForJob(...)` comparan por `isSameJobId(...)`.
+  - `renderUI`, `injectOverlay` y cache/feed limpian o deduplican instancias equivalentes antes de inyectar.
+  - `findJobCardById` compara IDs equivalentes en resolved id y links.
+- Se corrigio `Last viewed by client: yesterday`:
+  - runtime y scripts de prueba lo interpretan como 24h atras.
+  - ya no cae como `Sin "last viewed" visible (asumido frio)` cuando ese texto existe.
+- Validacion ejecutada:
+  - `node --check` OK en modulos JS tocados/nuevos.
+  - `npm.cmd run check-sniper-guardrails` OK; solo queda warning conocido: `sniper-extension/content-script-base.js` con 495 lineas.
+  - `npm.cmd run test-content` OK.
+  - `npm.cmd run test-html` OK.
+  - Smoke directo del extractor runtime: `yesterday -> Date valida`, `hours=24`.
+## 2026-05-14 - Empaquetado release 1.0.6
+- Se genero upwork-job-quality-grader-1.0.6.zip en la raiz del repo para subida.
+- El paquete contiene manifest.json version 1.0.6 y archivos de sniper-extension con manifest.json en la raiz del zip (formato valido para Chrome Web Store).
+## 2026-05-14 - Reescritura de descripcion amigable (no tecnica)
+- Se simplifico BADGES.md a una version breve para usuario no tecnico.
+- Se removieron reglas detalladas, umbrales y terminos tecnicos; ahora queda en formato corto con:
+  - resumen de valor,
+  - pasos de uso,
+  - senales positivas,
+  - senales de alerta.
+- Objetivo cumplido: lectura rapida y lenguaje mas amigable para decidir en Upwork.

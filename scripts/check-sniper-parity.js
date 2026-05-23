@@ -6,6 +6,7 @@ const extDir = path.join(root, 'sniper-extension');
 
 const read = (name) => fs.readFileSync(path.join(extDir, name), 'utf8');
 const has = (text, token) => text.includes(token);
+const manifest = JSON.parse(read('manifest.json'));
 
 const checks = [
   {
@@ -25,8 +26,8 @@ const checks = [
   },
   {
     file: 'content-script-methods-ui-badges.js',
-    token: "'Support Avg/hr'",
-    message: 'Support Avg/hr badge config missing',
+    token: "'Niche Avg/hr'",
+    message: 'Niche Avg/hr badge config missing',
   },
   {
     file: 'content-script-methods-ui-badges.js',
@@ -41,6 +42,20 @@ const checks = [
 ];
 
 const failures = [];
+
+if (manifest.host_permissions) {
+  failures.push('Manifest should not declare host_permissions for this content-script-only build');
+}
+if (manifest.background) {
+  failures.push('Manifest should not declare a background/service worker');
+}
+const forbiddenPermissions = ['tabs', 'scripting', 'webRequest', 'declarativeNetRequest', 'activeTab'];
+const declaredPermissions = Array.isArray(manifest.permissions) ? manifest.permissions : [];
+for (const permission of forbiddenPermissions) {
+  if (declaredPermissions.includes(permission)) {
+    failures.push(`Forbidden manifest permission declared: ${permission}`);
+  }
+}
 
 for (const c of checks) {
   const text = read(c.file);

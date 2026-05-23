@@ -1,5 +1,5 @@
 import type { Badge, JobInput } from './sniper-types';
-import { hoursSince } from './sniper-helpers';
+import { hoursSince, isValidDate } from './sniper-helpers';
 
 type AddBadge = (list: Badge[], badge: Badge) => void;
 
@@ -16,8 +16,11 @@ export const addFinalBadges = (
   addBadge: AddBadge,
   context: FinalBadgeContext
 ) => {
+  const lastViewed = isValidDate(input.lastViewed) ? input.lastViewed : null;
   if (context.isToxicClient) addBadge(badges, 'Toxic client');
-  if (hoursSince(input.lastViewed, now) > 48) addBadge(badges, 'Ghost job');
+  if (lastViewed && hoursSince(lastViewed, now) > 48 && input.interviewing === 0) {
+    addBadge(badges, 'Ghost job');
+  }
   if (input.interviewing > 7) addBadge(badges, 'Crowded room');
   if (context.isUrgentRequest) addBadge(badges, 'SOS');
 

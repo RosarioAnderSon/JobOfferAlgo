@@ -3,9 +3,6 @@
   "name": "Upwork Job Quality Grader",
   "version": "1.0.6",
   "description": "Evalúa trabajos de Upwork en tiempo real con scoring inteligente.",
-  "host_permissions": [
-    "https://www.upwork.com/*"
-  ],
   "content_scripts": [
     {
       "matches": [
@@ -36,6 +33,8 @@
         "content-script-methods-overlay-refresh.js",
         "content-script-methods-flow-overlay.js",
         "content-script-methods-flow-route.js",
+        "content-script-methods-flow-extract.js",
+        "content-script-methods-flow-render.js",
         "content-script-methods-cache-storage.js",
         "content-script-methods-cache.js",
         "content-script-badge-definitions.js",

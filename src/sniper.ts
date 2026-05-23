@@ -7,6 +7,7 @@ import {
   gradeFromScore,
   hireRatePoints,
   hoursSince,
+  isValidDate,
   jobsPostedPoints,
   monthsBetween,
   paymentPoints,
@@ -37,7 +38,8 @@ export const evaluateSniper = (input: JobInput): EvaluationResult => {
     );
   const killSwitches: string[] = [];
   const monthsActive = monthsBetween(input.memberSince, now);
-  const daysSinceViewed = daysSince(input.lastViewed, now);
+  const lastViewedDate = isValidDate(input.lastViewed) ? input.lastViewed : null;
+  const daysSinceViewed = lastViewedDate ? daysSince(lastViewedDate, now) : null;
   const isNewbieRisk =
     monthsActive < 3 &&
     !input.paymentVerified &&
@@ -47,7 +49,7 @@ export const evaluateSniper = (input: JobInput): EvaluationResult => {
   if (isNewbieRisk) {
     killSwitches.push('Newbie risk');
   }
-  if (daysSinceViewed > 2) {
+  if (daysSinceViewed !== null && daysSinceViewed > 2 && input.interviewing === 0) {
     killSwitches.push('Ghost job');
   }
   if (!input.paymentVerified && input.totalSpent === 0) {
@@ -96,7 +98,7 @@ export const evaluateSniper = (input: JobInput): EvaluationResult => {
       input.jobBudget
     ),
     rating: ratingPoints(input.rating, input.reviewsCount),
-    activity: activityPoints(input.lastViewed, now),
+    activity: activityPoints(input, now),
     proposals: proposalsPoints(input.proposalCount),
     payment: paymentPoints(input.paymentVerified),
     jobs: jobsPostedPoints(input.jobsPosted),

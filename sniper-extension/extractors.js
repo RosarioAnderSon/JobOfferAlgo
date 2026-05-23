@@ -147,7 +147,11 @@
       return Number.isFinite(single) ? single : 20;
     },
     extractLastViewed(text) {
-      const match = text.match(/Last viewed by client:.*?(\d+)\s*(minute|hour|day)s?\s*ago/is);
+      const source = normalizeText(text);
+      if (/Last viewed by client:?\s*yesterday\b/i.test(source)) {
+        return parseRelativeDate(1, 'day');
+      }
+      const match = source.match(/Last viewed by client:.*?(\d+)\s*(minute|hour|day)s?\s*ago/i);
       if (!match) return null;
       const value = parseInt(match[1], 10);
       return parseRelativeDate(value, match[2]) || null;

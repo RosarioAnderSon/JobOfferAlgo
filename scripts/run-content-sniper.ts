@@ -126,7 +126,11 @@ const extractContentScriptInput = (html: string): JobInput => {
   };
 
   const extractLastViewed = (text: string) => {
-    const match = text.match(/Last viewed by client:.*?(\d+)\s*(minute|hour|day)s?\s*ago/is);
+    const normalized = String(text || '').replace(/\s+/g, ' ').trim();
+    if (/Last viewed by client:?\s*yesterday\b/i.test(normalized)) {
+      return new Date(Date.now() - 24 * 60 * 60 * 1000);
+    }
+    const match = normalized.match(/Last viewed by client:.*?(\d+)\s*(minute|hour|day)s?\s*ago/i);
     if (!match) return undefined;
 
     const value = parseInt(match[1], 10);
@@ -209,7 +213,7 @@ const extractContentScriptInput = (html: string): JobInput => {
     reviewsCount: extractReviews(textForInfo),
     jobTitle: titleText.trim() || undefined,
     proposalCount: extractProposals(activityText || scopeText),
-    lastViewed: extractLastViewed(activityText || scopeText) || new Date(0),
+    lastViewed: extractLastViewed(activityText || scopeText),
     invitesSent: extractInvites(activityText || scopeText),
     interviewing: extractInterviewing(activityText || scopeText),
     descriptionText: descText,
